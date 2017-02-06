@@ -8,10 +8,12 @@ import Time exposing (Time)
 import Task
 import AnimationFrame
 import Html exposing (..)
+import Html.Lazy
 import Html.Attributes exposing (..)
 import Svg
 import Svg.Attributes
 import Color
+import Keyboard
 import Model exposing (..)
 import Selectable exposing (Selectable)
 import Grid exposing (Grid, rgbColor)
@@ -31,6 +33,19 @@ main =
                         AnimationFrame.times Tick
                       else
                         Sub.none
+                    , Keyboard.downs
+                        (\code ->
+                            if code == keyboard.left then
+                                Move Left
+                            else if code == keyboard.right then
+                                Move Right
+                            else if code == keyboard.up then
+                                Move Up
+                            else if code == keyboard.down then
+                                Move Down
+                            else
+                                NoOp
+                        )
                     ]
             )
         }
@@ -41,6 +56,7 @@ type Msg
     | RemoveInstruction Int Int
     | Select Int
     | Execute
+    | Move Direction
     | Fail
     | NoOp
     | Tick Time
@@ -48,6 +64,22 @@ type Msg
         { width : Int
         , height : Int
         }
+
+
+keyboard =
+    { left = 37
+    , right = 39
+    , up = 38
+    , down = 40
+    , a = 65
+    , d = 68
+    , w = 87
+    , s = 83
+    , space = 32
+    , esc = 27
+    , enter = 27
+    , tab = 9
+    }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -70,6 +102,13 @@ update msg model =
 
         Fail ->
             ( model, Cmd.none )
+
+        Move direction ->
+            ( { model
+                | path = move direction model.path
+              }
+            , Cmd.none
+            )
 
         Tick time ->
             ( { model | time = time }, Cmd.none )
@@ -125,8 +164,8 @@ view : Model -> Html Msg
 view model =
     div []
         [ node "style" [] [ text stylesheet ]
-        , viewGrid model.grid
-        , viewLevel model.levels.current model.grid model.time
+        , Html.Lazy.lazy viewGrid model.grid
+        , viewLevel model.path model.levels.current model.grid model.time
         , div [ class "overlay" ] [ text "bytefire" ]
         ]
 
@@ -136,19 +175,90 @@ viewGrid grid =
     Svg.svg
         [ Svg.Attributes.class "svg-base"
         ]
-        [ Grid.view grid Color.darkCharcoal
+        [ Grid.view grid <|
+            \( col, row ) ( x, y ) ->
+                Svg.circle
+                    [ Svg.Attributes.cx <| toString x
+                    , Svg.Attributes.cy <| toString y
+                    , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
+                    , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
+                    , Svg.Attributes.r "2"
+                      --, pulseOpacityOffset (toFloat (x + y)) currentTime
+                    ]
+                    []
         ]
 
 
-viewLevel : Level -> Grid -> Time -> Html Msg
-viewLevel level grid time =
+viewPath : Path -> Time -> Grid -> Html Msg
+viewPath (Path start moves) currentTime grid =
+    let
+        point color location =
+            Svg.g [ pulseOpacity currentTime ]
+                [ Svg.circle
+                    [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
+                    , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
+                    , Svg.Attributes.fill (rgbColor color)
+                    , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
+                    , Svg.Attributes.r "5"
+                    , Svg.Attributes.filter "url(#blurMe)"
+                    ]
+                    []
+                , Svg.circle
+                    [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
+                    , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
+                    , Svg.Attributes.fill (rgbColor color)
+                    , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
+                    , Svg.Attributes.r "3"
+                    ]
+                    []
+                ]
+
+        move direction ( { x, y }, rendered ) =
+            let
+                newPoint =
+                    case direction of
+                        Left ->
+                            { x = x - 1
+                            , y = y
+                            }
+
+                        Right ->
+                            { x = x + 1
+                            , y = y
+                            }
+
+                        Up ->
+                            { x = x
+                            , y = y - 1
+                            }
+
+                        Down ->
+                            { x = x
+                            , y = y + 1
+                            }
+            in
+                ( newPoint, point Color.blue newPoint :: rendered )
+
+        remainingPoints =
+            Tuple.second <| List.foldl move ( start, [] ) moves
+    in
+        Svg.g []
+            (point Color.yellow start :: remainingPoints)
+
+
+
+--viewLevel : Level -> Grid -> Time -> Html Msg
+
+
+viewLevel path level grid time =
     Svg.svg
         [ Svg.Attributes.class "svg-base"
         ]
         [ blurs
-        , viewMap level.map grid time
-        , viewRegisters level.registers
-        , viewFunctionUI allInstructions
+          --, viewMap level.map grid time
+          --, viewRegisters level.registers
+          --, viewFunctionUI allInstructions
+        , viewPath path time grid
         ]
 
 
@@ -268,6 +378,11 @@ viewRegisters selectableRegisters =
 viewFunctionUI : List Instruction -> Html Msg
 viewFunctionUI fns =
     Svg.g [] []
+
+
+pulseOpacityOffset : Float -> Time -> Html.Attribute msg
+pulseOpacityOffset offset currentTime =
+    Svg.Attributes.opacity <| toString <| pulse (currentTime + offset) (2 * Time.second) 0.5 1
 
 
 pulseOpacity : Time -> Html.Attribute msg

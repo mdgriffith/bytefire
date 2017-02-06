@@ -1,6 +1,7 @@
 module Grid exposing (..)
 
 import Svg exposing (Svg)
+import Svg.Lazy
 import Svg.Attributes exposing (..)
 import Color exposing (Color)
 
@@ -35,8 +36,11 @@ resize actualWidth actualHeight (Grid grid) =
         }
 
 
-view : Grid -> Color -> Svg msg
-view (Grid grid) color =
+
+--view : Grid -> () -> Svg msg
+
+
+view (Grid grid) fn =
     let
         coords =
             List.concatMap
@@ -52,14 +56,7 @@ view (Grid grid) color =
         Svg.g []
             (List.map
                 (\( x, y ) ->
-                    Svg.circle
-                        [ cx <| toString (x * grid.columnWidth)
-                        , cy <| toString (y * grid.rowHeight)
-                        , fill (rgbColor color)
-                        , stroke "rgba(0,0,0,0.0)"
-                        , r "2"
-                        ]
-                        []
+                    fn ( x, y ) ( x * grid.columnWidth, y * grid.rowHeight )
                 )
                 coords
             )

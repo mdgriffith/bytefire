@@ -7,6 +7,7 @@ import Time exposing (Time)
 
 type alias Model =
     { levels : Selectable Level
+    , path : Path
     , grid : Grid
     , running : Bool
     , time : Time
@@ -26,11 +27,23 @@ type alias Location =
     }
 
 
-type Instruction
-    = Forward
-    | Backward
-    | Left
+type alias Coords =
+    { x : Int, y : Int }
+
+
+type Path
+    = Path Coords (List Direction)
+
+
+type Direction
+    = Left
     | Right
+    | Up
+    | Down
+
+
+type Instruction
+    = Inst
 
 
 {-| Problem with making a game about programming is that you get overlapping words :/
@@ -41,9 +54,15 @@ type alias Function =
     }
 
 
+move : Direction -> Path -> Path
+move direction (Path start remainder) =
+    Path start (remainder ++ [ direction ])
+
+
 initialModel : Model
 initialModel =
     { levels = selectable [] [] levelOne
+    , path = Path { x = 20, y = 10 } []
     , grid = Grid.init 30 30 1000 600
     , running = True
     , time = 0
@@ -66,9 +85,6 @@ levelOne =
             { instructions = List.repeat 5 Nothing
             , name = "function 1"
             }
-        --, mapGrid = Grid.subgrid Grid.HCenter Grid.VCenter (100,100)
-        --, registerGrid =
-        --    Grid.subgrid Grid.HCenter Grid.Top (80, 20)
     }
 
 
@@ -90,8 +106,5 @@ selectable past upcoming current =
 
 allInstructions : List Instruction
 allInstructions =
-    [ Forward
-    , Backward
-    , Left
-    , Right
+    [ Inst
     ]

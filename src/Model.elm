@@ -2,11 +2,14 @@ module Model exposing (..)
 
 import Selectable exposing (Selectable)
 import Grid exposing (Grid)
+import Time exposing (Time)
 
 
 type alias Model =
     { levels : Selectable Level
     , grid : Grid
+    , running : Bool
+    , time : Time
     }
 
 
@@ -42,13 +45,15 @@ initialModel : Model
 initialModel =
     { levels = selectable [] [] levelOne
     , grid = Grid.init 30 30 1000 600
+    , running = True
+    , time = 0
     }
 
 
 resizeGrid : Int -> Int -> Model -> Model
 resizeGrid width height model =
-    { levels = model.levels
-    , grid = Grid.resize width height model.grid
+    { model
+        | grid = Grid.resize width height model.grid
     }
 
 
@@ -69,8 +74,8 @@ levelOne =
 
 startingLocation : Location
 startingLocation =
-    { x = 0
-    , y = 0
+    { x = 20
+    , y = 10
     , star = False
     }
 

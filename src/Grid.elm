@@ -2,6 +2,7 @@ module Grid exposing (..)
 
 import Svg exposing (Svg)
 import Svg.Attributes exposing (..)
+import Color exposing (Color)
 
 
 type Grid
@@ -34,8 +35,8 @@ resize actualWidth actualHeight (Grid grid) =
         }
 
 
-view : Grid -> Svg msg
-view (Grid grid) =
+view : Grid -> Color -> Svg msg
+view (Grid grid) color =
     let
         coords =
             List.concatMap
@@ -54,7 +55,7 @@ view (Grid grid) =
                     Svg.circle
                         [ cx <| toString (x * grid.columnWidth)
                         , cy <| toString (y * grid.rowHeight)
-                        , fill "#ccc"
+                        , fill (rgbColor color)
                         , stroke "rgba(0,0,0,0.0)"
                         , r "2"
                         ]
@@ -62,6 +63,23 @@ view (Grid grid) =
                 )
                 coords
             )
+
+
+rgbColor : Color -> String
+rgbColor color =
+    let
+        { red, green, blue, alpha } =
+            Color.toRgb color
+    in
+        "rgba("
+            ++ toString red
+            ++ ","
+            ++ toString green
+            ++ ","
+            ++ toString blue
+            ++ ","
+            ++ toString alpha
+            ++ ")"
 
 
 type alias Dimensions =
@@ -85,8 +103,18 @@ type Vertical
 
 
 pos : Grid -> ( Int, Int ) -> ( Int, Int )
-pos grid ( x, y ) =
-    ( x, y )
+pos (Grid grid) ( x, y ) =
+    ( x * grid.columnWidth, y * grid.rowHeight )
+
+
+posX : Grid -> Int -> Int
+posX (Grid grid) x =
+    x * grid.columnWidth
+
+
+posY : Grid -> Int -> Int
+posY (Grid grid) y =
+    y * grid.rowHeight
 
 
 subgrid : Horizontal -> Vertical -> Dimensions -> Grid -> Grid

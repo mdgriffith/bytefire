@@ -449,7 +449,7 @@ viewPath items path currentTime grid =
 
         point color starting location =
             if overlapping { x = location.x, y = location.y } nodes then
-                Svg.g [ pulseOpacity currentTime ]
+                Svg.g []
                     [ Svg.circle
                         [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
                         , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
@@ -457,10 +457,6 @@ viewPath items path currentTime grid =
                         , Svg.Attributes.strokeWidth "2"
                         , Svg.Attributes.fill "black"
                         , Svg.Attributes.r <| toString <| dotSizes.item + shadowDelta.captured
-                          --if starting then
-                          --    "9"
-                          --else
-                          --    "6"
                         ]
                         []
                     ]
@@ -512,6 +508,7 @@ viewPath items path currentTime grid =
                 , Svg.Attributes.strokeDasharray "5, 5"
                 , Svg.Attributes.stroke (rgbColor Color.yellow)
                 , Svg.Attributes.fill "rgba(0,0,0,0.0)"
+                , pulseOpacity currentTime
                 ]
                 []
     in

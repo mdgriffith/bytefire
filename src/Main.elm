@@ -218,11 +218,25 @@ update msg model =
                                                 )
 
                                     Call fn ->
-                                        ( { model
-                                            | mode = Executing (i + 1) model.time
-                                          }
-                                        , Cmd.none
-                                        )
+                                        let
+                                            fnIndex =
+                                                case fn of
+                                                    One ->
+                                                        0
+
+                                                    Two ->
+                                                        1
+
+                                                    Three ->
+                                                        2
+                                        in
+                                            ( { model
+                                                | mode = Executing 0 model.time
+                                                , registers =
+                                                    Selectable.select fnIndex model.registers
+                                              }
+                                            , Cmd.none
+                                            )
 
                 _ ->
                     ( { model
@@ -641,7 +655,24 @@ viewEnterToExecute mode insts time =
                         ]
                         [ Svg.text "[ Press Enter to Execute ]" ]
                 else
-                    Svg.text ""
+                    Svg.g []
+                        [ Svg.text_
+                            [ Svg.Attributes.x <| toString <| (i * 55) - 40
+                            , Svg.Attributes.y <| toString 45
+                            , Svg.Attributes.fill (rgbColor Color.yellow)
+                            , pulseOpacity time
+                            , Html.Attributes.style [ ( "font-size", "70" ) ]
+                            ]
+                            [ Svg.text "]" ]
+                        , Svg.text_
+                            [ Svg.Attributes.x <| toString -55
+                            , Svg.Attributes.y <| toString 45
+                            , Svg.Attributes.fill (rgbColor Color.yellow)
+                            , pulseOpacity time
+                            , Html.Attributes.style [ ( "font-size", "70" ) ]
+                            ]
+                            [ Svg.text "[" ]
+                        ]
 
             _ ->
                 Svg.text ""

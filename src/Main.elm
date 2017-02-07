@@ -107,11 +107,23 @@ update msg model =
             ( model, Cmd.none )
 
         Move direction ->
-            ( { model
-                | path = move direction model.path
-              }
-            , Cmd.none
-            )
+            let
+                newPath =
+                    move direction model.path
+            in
+                if winning newPath model.items then
+                    ( { model
+                        | path = newPath
+                        , mode = Success
+                      }
+                    , Cmd.none
+                    )
+                else
+                    ( { model
+                        | path = newPath
+                      }
+                    , Cmd.none
+                    )
 
         Tick time ->
             ( { model
@@ -187,6 +199,7 @@ body {
    margin-left:-150px;
    top:50%;
    margin-top:-30px;
+   text-align:center;
 }
 
 
@@ -204,6 +217,18 @@ view model =
                 div [ class "overlay" ]
                     [ div [ class "centered" ]
                         [ text "Paused" ]
+                    ]
+
+            Success ->
+                div [ class "overlay" ]
+                    [ div [ class "centered" ]
+                        [ text "Success" ]
+                    ]
+
+            Failed ->
+                div [ class "overlay" ]
+                    [ div [ class "centered" ]
+                        [ text "Failure" ]
                     ]
 
             _ ->
@@ -329,6 +354,18 @@ blurs =
         ]
 
 
+winning : Path -> List Item -> Bool
+winning path items =
+    let
+        nodes =
+            List.filter (\item -> item.kind == Node) items
+
+        rendered =
+            renderPath path
+    in
+        List.all (\node -> overlapping { x = node.x, y = node.y } rendered) nodes
+
+
 viewItem : Grid -> List Coords -> Time -> Item -> Html Msg
 viewItem grid renderedPath currentTime item =
     case item.kind of
@@ -386,7 +423,7 @@ viewRegisters selectableRegisters grid =
 
                     Selectable.Current ->
                         Svg.g
-                            [ Grid.transform grid 3 10
+                            [ Grid.transform grid 2 1
                             ]
                             (List.indexedMap viewInstruction register.instructions)
 

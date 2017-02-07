@@ -71,6 +71,27 @@ readyToExecute fn =
     List.all (\x -> x /= Nothing) fn.instructions
 
 
+removeLatest : Function -> Function
+removeLatest fn =
+    let
+        replace x ( removed, remain ) =
+            if removed then
+                ( removed, x :: remain )
+            else
+                case x of
+                    Nothing ->
+                        ( removed, x :: remain )
+
+                    Just _ ->
+                        ( True, Nothing :: remain )
+
+        newInstructions =
+            List.foldr replace ( False, [] ) fn.instructions
+                |> Tuple.second
+    in
+        { fn | instructions = newInstructions }
+
+
 replaceFirstNothing : Instruction -> Function -> Function
 replaceFirstNothing instruction fn =
     let

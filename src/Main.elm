@@ -52,6 +52,8 @@ main =
                                 TogglePause
                             else if code == keyboard.enter then
                                 Execute
+                            else if code == keyboard.backspace then
+                                RemoveInstruction
                             else
                                 NoOp
                         )
@@ -62,7 +64,7 @@ main =
 
 type Msg
     = AddInstruction Instruction
-    | RemoveInstruction Int Int
+    | RemoveInstruction
     | Select Int
     | Execute
     | ExecuteNextStep
@@ -89,6 +91,7 @@ keyboard =
     , esc = 27
     , enter = 13
     , tab = 9
+    , backspace = 8
     }
 
 
@@ -112,8 +115,19 @@ update msg model =
                 , Cmd.none
                 )
 
-        RemoveInstruction fnIndex registerIndex ->
-            ( model, Cmd.none )
+        RemoveInstruction ->
+            let
+                oldRegisters =
+                    model.registers
+
+                revisedRegisters =
+                    { oldRegisters
+                        | current = removeLatest model.registers.current
+                    }
+            in
+                ( { model | registers = revisedRegisters }
+                , Cmd.none
+                )
 
         Select index ->
             ( model, Cmd.none )

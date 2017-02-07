@@ -104,6 +104,11 @@ pos (Grid grid) ( x, y ) =
     ( x * grid.columnWidth, y * grid.rowHeight )
 
 
+transform : Grid -> Int -> Int -> Svg.Attribute msg
+transform grid x y =
+    Svg.Attributes.transform <| "translate(" ++ toString (posX grid x) ++ "," ++ toString (posY grid y) ++ ")"
+
+
 posX : Grid -> Int -> Int
 posX (Grid grid) x =
     x * grid.columnWidth

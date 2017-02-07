@@ -29,7 +29,7 @@ main =
             (\model ->
                 Sub.batch
                     [ Window.resizes WindowResize
-                    , if model.running then
+                    , if model.mode == Playing then
                         AnimationFrame.times Tick
                       else
                         Sub.none
@@ -43,6 +43,8 @@ main =
                                 Move Up
                             else if code == keyboard.down then
                                 Move Down
+                            else if code == keyboard.esc then
+                                TogglePause
                             else
                                 NoOp
                         )
@@ -57,6 +59,7 @@ type Msg
     | Select Int
     | Execute
     | Move Direction
+    | TogglePause
     | Fail
     | NoOp
     | Tick Time
@@ -111,7 +114,22 @@ update msg model =
             )
 
         Tick time ->
-            ( { model | time = time }, Cmd.none )
+            ( { model
+                | time = time
+              }
+            , Cmd.none
+            )
+
+        TogglePause ->
+            ( { model
+                | mode =
+                    if model.mode == Paused then
+                        Playing
+                    else
+                        Paused
+              }
+            , Cmd.none
+            )
 
         WindowResize { width, height } ->
             let
@@ -134,6 +152,7 @@ update msg model =
 
 stylesheet =
     """
+@import url("https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css");
 body {
     background-color: black;
     color: #FAFAFA;
@@ -154,6 +173,20 @@ body {
 }
 .overlay {
     position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background-color: rgba(1,1,1,0.5);
+}
+.centered {
+   position:absolute;
+   width:300px;
+   height:60px;
+   left:50%;
+   margin-left:-150px;
+   top:50%;
+   margin-top:-30px;
 }
 
 
@@ -165,8 +198,16 @@ view model =
     div []
         [ node "style" [] [ text stylesheet ]
         , Html.Lazy.lazy viewGrid model.grid
-        , viewLevel model.path model.levels.current model.grid model.time
-        , div [ class "overlay" ] [ text "bytefire" ]
+        , viewLevel model
+        , case model.mode of
+            Paused ->
+                div [ class "overlay" ]
+                    [ div [ class "centered" ]
+                        [ text "Paused" ]
+                    ]
+
+            _ ->
+                text ""
         ]
 
 
@@ -250,16 +291,21 @@ viewPath (Path start moves) currentTime grid =
 --viewLevel : Level -> Grid -> Time -> Html Msg
 
 
-viewLevel path level grid time =
-    Svg.svg
-        [ Svg.Attributes.class "svg-base"
-        ]
-        [ blurs
-          --, viewMap level.map grid time
-          --, viewRegisters level.registers
-          --, viewFunctionUI allInstructions
-        , viewPath path time grid
-        ]
+viewLevel { path, time, grid, registers, items } =
+    let
+        renderedPath =
+            renderPath path
+    in
+        Svg.svg
+            [ Svg.Attributes.class "svg-base"
+            ]
+            [ blurs
+            , Svg.g [] (List.map (viewItem grid renderedPath time) items)
+              --, viewMap level.map grid time
+            , viewRegisters registers grid
+              --, viewFunctionUI allInstructions
+            , viewPath path time grid
+            ]
 
 
 blurs =
@@ -283,96 +329,165 @@ blurs =
         ]
 
 
-viewMap : Selectable Location -> Grid -> Time -> Html Msg
-viewMap selectableLocations grid currentTime =
-    Svg.g []
-        (Selectable.mapLocation
-            (\pos location ->
-                case pos of
-                    Selectable.Past ->
-                        Svg.g [ pulseOpacity currentTime ]
-                            [ Svg.circle
-                                [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
-                                , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
-                                , Svg.Attributes.fill (rgbColor Color.green)
-                                , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
-                                , Svg.Attributes.r "5"
-                                , Svg.Attributes.filter "url(#blurMe)"
-                                ]
-                                []
-                            , Svg.circle
-                                [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
-                                , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
-                                , Svg.Attributes.fill (rgbColor Color.green)
-                                , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
-                                , Svg.Attributes.r "3"
-                                ]
-                                []
-                            ]
-
-                    Selectable.Current ->
-                        Svg.g [ pulseOpacity currentTime ]
-                            [ Svg.circle
-                                [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
-                                , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
-                                , Svg.Attributes.fill (rgbColor Color.yellow)
-                                , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
-                                , Svg.Attributes.r "5"
-                                , Svg.Attributes.filter "url(#blurMe)"
-                                ]
-                                []
-                            , Svg.circle
-                                [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
-                                , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
-                                , Svg.Attributes.fill (rgbColor Color.yellow)
-                                , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
-                                , Svg.Attributes.r "3"
-                                ]
-                                []
-                            ]
-
-                    Selectable.Upcoming ->
-                        Svg.g [ pulseOpacity currentTime ]
-                            [ Svg.circle
-                                [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
-                                , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
-                                , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
-                                , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
-                                , Svg.Attributes.r "5"
-                                , Svg.Attributes.filter "url(#blurMe)"
-                                ]
-                                []
-                            , Svg.circle
-                                [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
-                                , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
-                                , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
-                                , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
-                                , Svg.Attributes.r "3"
-                                ]
-                                []
-                            ]
-            )
-            selectableLocations
-        )
+viewItem : Grid -> List Coords -> Time -> Item -> Html Msg
+viewItem grid renderedPath currentTime item =
+    case item.kind of
+        Node ->
+            if overlapping { x = item.x, y = item.y } renderedPath then
+                Svg.g [ pulseOpacity currentTime ]
+                    [ Svg.circle
+                        [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
+                        , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
+                        , Svg.Attributes.fill (rgbColor Color.black)
+                        , Svg.Attributes.stroke (rgbColor Color.yellow)
+                        , Svg.Attributes.r "8"
+                        , Svg.Attributes.filter "url(#blurMe)"
+                        ]
+                        []
+                    , Svg.circle
+                        [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
+                        , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
+                        , Svg.Attributes.fill (rgbColor Color.black)
+                        , Svg.Attributes.stroke (rgbColor Color.black)
+                        , Svg.Attributes.r "5"
+                        ]
+                        []
+                    ]
+            else
+                Svg.g [ pulseOpacity currentTime ]
+                    [ Svg.circle
+                        [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
+                        , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
+                        , Svg.Attributes.fill (rgbColor Color.green)
+                        , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
+                        , Svg.Attributes.r "5"
+                        , Svg.Attributes.filter "url(#blurMe)"
+                        ]
+                        []
+                    , Svg.circle
+                        [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
+                        , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
+                        , Svg.Attributes.fill (rgbColor Color.green)
+                        , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
+                        , Svg.Attributes.r "3"
+                        ]
+                        []
+                    ]
 
 
-viewRegisters : Selectable Function -> Html Msg
-viewRegisters selectableRegisters =
+viewRegisters : Selectable Function -> Grid -> Html Msg
+viewRegisters selectableRegisters grid =
     Svg.g []
         (Selectable.indexedMapLocation
             (\pos i register ->
                 case pos of
                     Selectable.Past ->
-                        square 200 (i * 20)
+                        square (Grid.posY grid 3) (Grid.posY grid 20)
 
                     Selectable.Current ->
-                        square 200 (i * 20)
+                        Svg.g
+                            [ Grid.transform grid 3 10
+                            ]
+                            (List.indexedMap viewInstruction register.instructions)
 
                     Selectable.Upcoming ->
-                        square 200 (i * 20)
+                        square (Grid.posY grid 3) (Grid.posY grid 20)
             )
             selectableRegisters
         )
+
+
+viewInstruction : Int -> Maybe Instruction -> Html Msg
+viewInstruction i mInstruction =
+    case mInstruction of
+        Nothing ->
+            Svg.circle
+                [ Svg.Attributes.cx <| toString (i * 50)
+                , Svg.Attributes.cy <| toString (30)
+                , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
+                , Svg.Attributes.stroke (rgbColor Color.black)
+                , Svg.Attributes.strokeWidth "5"
+                , Svg.Attributes.r "30"
+                ]
+                []
+
+        Just instruction ->
+            case instruction of
+                Model.Move Left ->
+                    Svg.g []
+                        [ Svg.circle
+                            [ Svg.Attributes.cx <| toString (i * 50)
+                            , Svg.Attributes.cy <| toString (30)
+                            , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
+                            , Svg.Attributes.stroke (rgbColor Color.black)
+                            , Svg.Attributes.strokeWidth "5"
+                            , Svg.Attributes.r "30"
+                            ]
+                            []
+                        , Svg.text_
+                            [ Svg.Attributes.stroke (rgbColor Color.white)
+                            , Svg.Attributes.x <| toString (i * 50)
+                            , Svg.Attributes.y <| toString (30)
+                            ]
+                            [ text "left" ]
+                        ]
+
+                Model.Move Right ->
+                    Svg.g []
+                        [ Svg.circle
+                            [ Svg.Attributes.cx <| toString (i * 50)
+                            , Svg.Attributes.cy <| toString (30)
+                            , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
+                            , Svg.Attributes.stroke (rgbColor Color.black)
+                            , Svg.Attributes.strokeWidth "5"
+                            , Svg.Attributes.r "30"
+                            ]
+                            []
+                        , Svg.text_
+                            [ Svg.Attributes.stroke (rgbColor Color.white)
+                            , Svg.Attributes.x <| toString (i * 50)
+                            , Svg.Attributes.y <| toString (30)
+                            ]
+                            [ text "right" ]
+                        ]
+
+                Model.Move Up ->
+                    Svg.g []
+                        [ Svg.circle
+                            [ Svg.Attributes.cx <| toString (i * 50)
+                            , Svg.Attributes.cy <| toString (30)
+                            , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
+                            , Svg.Attributes.stroke (rgbColor Color.black)
+                            , Svg.Attributes.strokeWidth "5"
+                            , Svg.Attributes.r "30"
+                            ]
+                            []
+                        , Svg.text_
+                            [ Svg.Attributes.stroke (rgbColor Color.white)
+                            , Svg.Attributes.x <| toString (i * 50)
+                            , Svg.Attributes.y <| toString (30)
+                            ]
+                            [ text "up" ]
+                        ]
+
+                Model.Move Down ->
+                    Svg.g []
+                        [ Svg.circle
+                            [ Svg.Attributes.cx <| toString (i * 30)
+                            , Svg.Attributes.cy <| toString (30)
+                            , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
+                            , Svg.Attributes.stroke (rgbColor Color.black)
+                            , Svg.Attributes.strokeWidth "5"
+                            , Svg.Attributes.r "30"
+                            ]
+                            []
+                        , Svg.text_
+                            [ Svg.Attributes.stroke (rgbColor Color.white)
+                            , Svg.Attributes.x <| toString (i * 50)
+                            , Svg.Attributes.y <| toString (30)
+                            ]
+                            [ text "down" ]
+                        ]
 
 
 viewFunctionUI : List Instruction -> Html Msg

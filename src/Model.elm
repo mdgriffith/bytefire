@@ -6,24 +6,36 @@ import Time exposing (Time)
 
 
 type alias Model =
-    { levels : Selectable Level
-    , path : Path
+    { path : Path
+    , items : List Item
+    , registers : Selectable Function
     , grid : Grid
     , running : Bool
     , time : Time
+    , mode : Mode
     }
+
+
+type Mode
+    = Playing
+    | Paused
+    | Success
+    | Failed
 
 
 type alias Level =
-    { map : Selectable Location
-    , registers : Selectable Function
+    { registers : Selectable Function
     }
 
 
-type alias Location =
+type ItemType
+    = Node
+
+
+type alias Item =
     { x : Int
     , y : Int
-    , star : Bool
+    , kind : ItemType
     }
 
 
@@ -43,15 +55,54 @@ type Direction
 
 
 type Instruction
-    = Inst
+    = Move Direction
 
 
 {-| Problem with making a game about programming is that you get overlapping words :/
 -}
 type alias Function =
     { instructions : List (Maybe Instruction)
-    , name : String
     }
+
+
+overlapping : Coords -> List Coords -> Bool
+overlapping coord all =
+    List.any ((==) coord) all
+
+
+renderPath : Path -> List Coords
+renderPath (Path start moves) =
+    let
+        move direction ( { x, y }, rendered ) =
+            let
+                newPoint =
+                    case direction of
+                        Left ->
+                            { x = x - 1
+                            , y = y
+                            }
+
+                        Right ->
+                            { x = x + 1
+                            , y = y
+                            }
+
+                        Up ->
+                            { x = x
+                            , y = y - 1
+                            }
+
+                        Down ->
+                            { x = x
+                            , y = y + 1
+                            }
+            in
+                ( newPoint, newPoint :: rendered )
+
+        points =
+            Tuple.second <| List.foldl move ( start, [] ) moves
+    in
+        start :: points
 
 
 move : Direction -> Path -> Path
@@ -61,11 +112,36 @@ move direction (Path start remainder) =
 
 initialModel : Model
 initialModel =
-    { levels = selectable [] [] levelOne
+    { mode = Playing
     , path = Path { x = 20, y = 10 } []
+    , items =
+        [ { x = 25
+          , y = 25
+          , kind = Node
+          }
+        , { x = 35
+          , y = 20
+          , kind = Node
+          }
+        , { x = 30
+          , y = 25
+          , kind = Node
+          }
+        ]
     , grid = Grid.init 30 30 1000 600
     , running = True
     , time = 0
+    , registers =
+        selectable []
+            []
+            { instructions =
+                [ Just <| Move Left
+                , Just <| Move Up
+                , Just <| Move Right
+                , Just <| Move Up
+                , Nothing
+                ]
+            }
     }
 
 
@@ -76,24 +152,29 @@ resizeGrid width height model =
     }
 
 
-levelOne : Level
-levelOne =
-    { map = selectable [] [] startingLocation
-    , registers =
-        selectable []
-            []
-            { instructions = List.repeat 5 Nothing
-            , name = "function 1"
-            }
-    }
 
-
-startingLocation : Location
-startingLocation =
-    { x = 20
-    , y = 10
-    , star = False
-    }
+--levels = selectable [] [] levelOne
+--levelOne : Level
+--levelOne =
+--    { map = selectable [] [] startingLocation
+--    , registers =
+--        selectable []
+--            []
+--            { instructions =
+--                [ Just <| Move Left
+--                , Just <| Move Up
+--                , Just <| Move Right
+--                , Just <| Move Up
+--                , Nothing
+--                ]
+--            }
+--    }
+--startingLocation : Location
+--startingLocation =
+--{ x = 20
+--, y = 10
+--, star = False
+--}
 
 
 selectable : List a -> List a -> a -> Selectable a
@@ -106,5 +187,4 @@ selectable past upcoming current =
 
 allInstructions : List Instruction
 allInstructions =
-    [ Inst
-    ]
+    []

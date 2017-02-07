@@ -24,11 +24,6 @@ type Mode
     | Failed Time
 
 
-type alias Level =
-    { registers : Selectable Function
-    }
-
-
 type ItemType
     = Node
 
@@ -57,6 +52,13 @@ type Direction
 
 type Instruction
     = Move Direction
+    | Call FnIndex
+
+
+type FnIndex
+    = One
+    | Two
+    | Three
 
 
 {-| Problem with making a game about programming is that you get overlapping words :/
@@ -189,7 +191,15 @@ initialModel =
     , time = 0
     , registers =
         selectable []
-            []
+            [ { instructions =
+                    [ Nothing
+                    , Nothing
+                    , Nothing
+                    , Nothing
+                    , Nothing
+                    ]
+              }
+            ]
             { instructions =
                 [ Nothing
                 , Nothing

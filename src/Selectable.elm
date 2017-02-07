@@ -14,6 +14,45 @@ type Loc
     | Upcoming
 
 
+select : Int -> Selectable a -> Selectable a
+select i ({ past, current, upcoming } as x) =
+    let
+        pastLength =
+            List.length past
+
+        upcomingCount =
+            List.length upcoming
+
+        full =
+            past ++ [ current ] ++ upcoming
+
+        normalizedIndex =
+            if i >= List.length full then
+                rem i (List.length full)
+            else
+                i
+    in
+        { past = List.take (normalizedIndex) full
+        , current =
+            List.drop normalizedIndex full
+                |> List.head
+                |> Maybe.withDefault current
+        , upcoming = List.drop (normalizedIndex + 1) full
+        }
+
+
+nextCycledIndex : Selectable a -> Int
+nextCycledIndex { past, current, upcoming } =
+    let
+        upcomingCount =
+            List.length upcoming
+    in
+        if upcomingCount == 0 then
+            0
+        else
+            List.length past + 1
+
+
 map : (a -> b) -> Selectable a -> Selectable b
 map fn selectable =
     { past = List.map fn selectable.past
@@ -50,6 +89,6 @@ indexedMapLocation fn selectable =
             fn Current pastLength selectable.current
 
         upcoming =
-            List.indexedMap (\i a -> fn Upcoming (i + pastLength + 1) a) selectable.past
+            List.indexedMap (\i a -> fn Upcoming (i + pastLength + 1) a) selectable.upcoming
     in
         past ++ [ current ] ++ upcoming

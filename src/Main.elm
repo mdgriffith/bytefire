@@ -51,6 +51,14 @@ main =
                                 Execute
                             else if code == keyboard.backspace then
                                 RemoveInstruction
+                            else if code == keyboard.one then
+                                AddInstruction <| Call One
+                            else if code == keyboard.two then
+                                AddInstruction <| Call Two
+                            else if code == keyboard.three then
+                                AddInstruction <| Call Three
+                            else if code == keyboard.space then
+                                Select (Selectable.nextCycledIndex model.registers)
                             else
                                 NoOp
                         )
@@ -90,6 +98,9 @@ keyboard =
     , enter = 13
     , tab = 9
     , backspace = 8
+    , one = 49
+    , two = 50
+    , three = 51
     }
 
 
@@ -137,7 +148,9 @@ update msg model =
                 )
 
         Select index ->
-            ( model, Cmd.none )
+            ( { model | registers = Selectable.select index model.registers }
+            , Cmd.none
+            )
 
         Execute ->
             if readyToExecute model.registers.current then
@@ -203,6 +216,13 @@ update msg model =
                                                   }
                                                 , Cmd.none
                                                 )
+
+                                    Call fn ->
+                                        ( { model
+                                            | mode = Executing (i + 1) model.time
+                                          }
+                                        , Cmd.none
+                                        )
 
                 _ ->
                     ( { model
@@ -574,16 +594,22 @@ viewRegisters mode selectableRegisters grid currentTime =
             (\pos i register ->
                 case pos of
                     Selectable.Past ->
-                        square (Grid.posY grid 3) (Grid.posY grid 20)
+                        Svg.g
+                            [ Grid.transform grid 2 (i + 1)
+                            ]
+                            (List.indexedMap viewInstruction register.instructions)
 
                     Selectable.Current ->
                         Svg.g
-                            [ Grid.transform grid 2 1
+                            [ Grid.transform grid 2 (i + 1)
                             ]
                             (viewEnterToExecute mode register.instructions currentTime :: List.indexedMap viewInstruction register.instructions)
 
                     Selectable.Upcoming ->
-                        square (Grid.posY grid 3) (Grid.posY grid 20)
+                        Svg.g
+                            [ Grid.transform grid 2 (i + 1)
+                            ]
+                            (List.indexedMap viewInstruction register.instructions)
             )
             selectableRegisters
         )
@@ -659,19 +685,49 @@ viewInstruction i mInstruction =
                             ]
                             []
                         ]
+
+                textNode txt =
+                    Svg.g []
+                        [ Svg.circle
+                            [ Svg.Attributes.cx <| toString (i * 55)
+                            , Svg.Attributes.cy <| toString (30)
+                            , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
+                            , Svg.Attributes.stroke (rgbColor Color.black)
+                            , Svg.Attributes.strokeWidth "5"
+                            , Svg.Attributes.r "30"
+                            ]
+                            []
+                        , Svg.text_
+                            [ Svg.Attributes.x <| toString <| (i * 55) - 8
+                            , Svg.Attributes.y <| toString <| (30) + 5
+                            , Svg.Attributes.width "55"
+                            , Svg.Attributes.height "30"
+                            , Svg.Attributes.fill "#fff"
+                            ]
+                            [ Svg.text txt ]
+                        ]
             in
                 case instruction of
-                    Model.Move Left ->
+                    Move Left ->
                         node 8 0
 
-                    Model.Move Right ->
+                    Move Right ->
                         node (-8) 0
 
-                    Model.Move Up ->
+                    Move Up ->
                         node 0 8
 
-                    Model.Move Down ->
+                    Move Down ->
                         node 0 (-8)
+
+                    Call One ->
+                        textNode "F1"
+
+                    Call Two ->
+                        textNode "F2"
+
+                    Call Three ->
+                        textNode "F3"
 
 
 viewFunctionUI : List Instruction -> Html Msg

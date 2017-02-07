@@ -104,6 +104,15 @@ keyboard =
     }
 
 
+andThen : Msg -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+andThen msg ( model, cmd ) =
+    let
+        ( updated, newCmd ) =
+            update msg model
+    in
+        ( updated, Cmd.batch [ cmd, newCmd ] )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -153,13 +162,10 @@ update msg model =
             )
 
         Execute ->
-            if readyToExecute model.registers.current then
-                update ExecuteNextStep
-                    { model
-                        | mode = Executing 0 model.time
-                    }
-            else
-                ( model, Cmd.none )
+            update ExecuteNextStep
+                { model
+                    | mode = Executing 0 model.time
+                }
 
         Fail ->
             ( model, Cmd.none )
@@ -189,11 +195,18 @@ update msg model =
                                     , Cmd.none
                                     )
                                 else
-                                    ( { model
-                                        | mode = Failed model.time
-                                      }
-                                    , Cmd.none
-                                    )
+                                    case model.stack of
+                                        [] ->
+                                            ( { model
+                                                | mode = Failed model.time
+                                              }
+                                            , Cmd.none
+                                            )
+
+                                        (StackLevel fnIndex step) :: remain ->
+                                            { model | mode = Executing step model.time }
+                                                |> update (Select fnIndex)
+                                                |> andThen ExecuteNextStep
 
                             Just instruction ->
                                 case instruction of
@@ -229,14 +242,25 @@ update msg model =
 
                                                     Three ->
                                                         2
+
+                                            currentRegister =
+                                                Selectable.currentIndex model.registers
                                         in
-                                            ( { model
-                                                | mode = Executing 0 model.time
-                                                , registers =
-                                                    Selectable.select fnIndex model.registers
-                                              }
-                                            , Cmd.none
-                                            )
+                                            if List.length model.stack > 5 then
+                                                ( { model
+                                                    | mode = Failed model.time
+                                                  }
+                                                , Cmd.none
+                                                )
+                                            else
+                                                ( { model
+                                                    | mode = Executing 0 model.time
+                                                    , stack = StackLevel currentRegister (i + 1) :: model.stack
+                                                    , registers =
+                                                        Selectable.select fnIndex model.registers
+                                                  }
+                                                , Cmd.none
+                                                )
 
                 _ ->
                     ( { model
@@ -271,7 +295,7 @@ update msg model =
                             )
 
                     Failed failTime ->
-                        if time - failTime > 0.4 * Time.second then
+                        if time - failTime > 1.0 * Time.second then
                             update
                                 Reboot
                                 { model
@@ -387,7 +411,7 @@ view model =
             Failed _ ->
                 div [ class "overlay" ]
                     [ div [ class "centered", style [ ( "color", rgbColor Color.red ) ] ]
-                        [ text "[ Failure ]" ]
+                        [ text "[ Failure...Rebooting ]" ]
                     ]
 
             _ ->

@@ -53,6 +53,11 @@ nextCycledIndex { past, current, upcoming } =
             List.length past + 1
 
 
+currentIndex : Selectable a -> Int
+currentIndex { past } =
+    List.length past
+
+
 map : (a -> b) -> Selectable a -> Selectable b
 map fn selectable =
     { past = List.map fn selectable.past

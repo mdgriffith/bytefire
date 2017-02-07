@@ -13,7 +13,12 @@ type alias Model =
     , running : Bool
     , time : Time
     , mode : Mode
+    , stack : List StackLevel
     }
+
+
+type StackLevel
+    = StackLevel Int Int
 
 
 type Mode
@@ -172,6 +177,7 @@ initialModel : Model
 initialModel =
     { mode = Playing
     , path = Path { x = 5, y = 5 } []
+    , stack = []
     , items =
         [ { x = 6
           , y = 5
@@ -182,6 +188,10 @@ initialModel =
           , kind = Node
           }
         , { x = 8
+          , y = 7
+          , kind = Node
+          }
+        , { x = 12
           , y = 7
           , kind = Node
           }

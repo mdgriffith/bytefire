@@ -21,7 +21,7 @@ type Mode
     | Executing Int Time
     | Paused
     | Success
-    | Failed
+    | Failed Time
 
 
 type alias Level =
@@ -69,6 +69,11 @@ type alias Function =
 readyToExecute : Function -> Bool
 readyToExecute fn =
     List.all (\x -> x /= Nothing) fn.instructions
+
+
+resetRegisters : Function -> Function
+resetRegisters fn =
+    { fn | instructions = List.repeat (List.length fn.instructions) Nothing }
 
 
 removeLatest : Function -> Function
@@ -156,21 +161,26 @@ move direction (Path start remainder) =
     Path start (remainder ++ [ direction ])
 
 
+resetPath : Path -> Path
+resetPath (Path start _) =
+    Path start []
+
+
 initialModel : Model
 initialModel =
     { mode = Playing
     , path = Path { x = 20, y = 10 } []
     , items =
-        [ { x = 25
-          , y = 25
+        [ { x = 21
+          , y = 10
           , kind = Node
           }
-        , { x = 35
-          , y = 20
+        , { x = 23
+          , y = 12
           , kind = Node
           }
-        , { x = 30
-          , y = 25
+        , { x = 21
+          , y = 11
           , kind = Node
           }
         ]

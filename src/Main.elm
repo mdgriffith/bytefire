@@ -30,14 +30,11 @@ main =
                 Sub.batch
                     [ Window.resizes WindowResize
                     , case model.mode of
-                        Playing ->
-                            AnimationFrame.times Tick
-
-                        Executing _ _ ->
-                            AnimationFrame.times Tick
+                        Paused ->
+                            Sub.none
 
                         _ ->
-                            Sub.none
+                            AnimationFrame.times Tick
                     , Keyboard.downs
                         (\code ->
                             if code == keyboard.left then
@@ -63,14 +60,15 @@ main =
 
 
 type Msg
-    = AddInstruction Instruction
+    = NoOp
+    | Reboot
+    | AddInstruction Instruction
     | RemoveInstruction
     | Select Int
     | Execute
     | ExecuteNextStep
     | TogglePause
     | Fail
-    | NoOp
     | Tick Time
     | WindowResize
         { width : Int
@@ -100,6 +98,15 @@ update msg model =
     case msg of
         NoOp ->
             ( model, Cmd.none )
+
+        Reboot ->
+            ( { model
+                | registers = Selectable.map resetRegisters model.registers
+                , path = resetPath model.path
+                , mode = Playing
+              }
+            , Cmd.none
+            )
 
         AddInstruction instruction ->
             let
@@ -170,7 +177,7 @@ update msg model =
                                     )
                                 else
                                     ( { model
-                                        | mode = Failed
+                                        | mode = Failed model.time
                                       }
                                     , Cmd.none
                                     )
@@ -199,7 +206,7 @@ update msg model =
 
                 _ ->
                     ( { model
-                        | mode = Failed
+                        | mode = Failed model.time
                       }
                     , Cmd.none
                     )
@@ -214,18 +221,41 @@ update msg model =
                         _ ->
                             False
             in
-                if executeNextStep then
-                    update
-                        ExecuteNextStep
-                        { model
+                case model.mode of
+                    Executing _ lastStepTime ->
+                        if time - lastStepTime > 0.1 * Time.second then
+                            update
+                                ExecuteNextStep
+                                { model
+                                    | time = time
+                                }
+                        else
+                            ( { model
+                                | time = time
+                              }
+                            , Cmd.none
+                            )
+
+                    Failed failTime ->
+                        if time - failTime > 0.4 * Time.second then
+                            update
+                                Reboot
+                                { model
+                                    | time = time
+                                }
+                        else
+                            ( { model
+                                | time = time
+                              }
+                            , Cmd.none
+                            )
+
+                    _ ->
+                        ( { model
                             | time = time
-                        }
-                else
-                    ( { model
-                        | time = time
-                      }
-                    , Cmd.none
-                    )
+                          }
+                        , Cmd.none
+                        )
 
         TogglePause ->
             ( { model
@@ -320,7 +350,7 @@ view model =
                         [ text "Success" ]
                     ]
 
-            Failed ->
+            Failed _ ->
                 div [ class "overlay" ]
                     [ div [ class "centered" ]
                         [ text "Failure" ]
@@ -401,7 +431,7 @@ viewPath path currentTime grid =
 --viewLevel : Level -> Grid -> Time -> Html Msg
 
 
-viewLevel { path, time, grid, registers, items } =
+viewLevel { path, time, grid, registers, items, mode } =
     let
         renderedPath =
             renderPath path
@@ -413,7 +443,7 @@ viewLevel { path, time, grid, registers, items } =
             , defs
             , Svg.g [] (List.map (viewItem grid renderedPath time) items)
               --, viewMap level.map grid time
-            , viewRegisters registers grid time
+            , viewRegisters mode registers grid time
               --, viewFunctionUI allInstructions
             , viewPath path time grid
             ]
@@ -514,8 +544,8 @@ viewItem grid renderedPath currentTime item =
                     ]
 
 
-viewRegisters : Selectable Function -> Grid -> Time -> Html Msg
-viewRegisters selectableRegisters grid currentTime =
+viewRegisters : Mode -> Selectable Function -> Grid -> Time -> Html Msg
+viewRegisters mode selectableRegisters grid currentTime =
     Svg.g []
         (Selectable.indexedMapLocation
             (\pos i register ->
@@ -527,7 +557,7 @@ viewRegisters selectableRegisters grid currentTime =
                         Svg.g
                             [ Grid.transform grid 2 1
                             ]
-                            (viewEnterToExecute register.instructions currentTime :: List.indexedMap viewInstruction register.instructions)
+                            (viewEnterToExecute mode register.instructions currentTime :: List.indexedMap viewInstruction register.instructions)
 
                     Selectable.Upcoming ->
                         square (Grid.posY grid 3) (Grid.posY grid 20)
@@ -536,22 +566,36 @@ viewRegisters selectableRegisters grid currentTime =
         )
 
 
-viewEnterToExecute : List (Maybe Instruction) -> Time -> Html Msg
-viewEnterToExecute insts time =
+viewEnterToExecute : Mode -> List (Maybe Instruction) -> Time -> Html Msg
+viewEnterToExecute mode insts time =
     let
         i =
             List.length insts
     in
-        if List.all (\x -> x /= Nothing) insts then
-            Svg.text_
-                [ Svg.Attributes.x <| toString (i * 55)
-                , Svg.Attributes.y <| toString (35)
-                , Svg.Attributes.fill (rgbColor Color.yellow)
-                , pulseOpacity time
-                ]
-                [ Svg.text "[ Press Enter to Execute ]" ]
-        else
-            Svg.text ""
+        case mode of
+            Executing _ _ ->
+                Svg.text_
+                    [ Svg.Attributes.x <| toString (i * 55)
+                    , Svg.Attributes.y <| toString (35)
+                    , Svg.Attributes.fill (rgbColor Color.red)
+                    , pulseOpacity time
+                    ]
+                    [ Svg.text "[ Executing... ]" ]
+
+            Playing ->
+                if List.all (\x -> x /= Nothing) insts then
+                    Svg.text_
+                        [ Svg.Attributes.x <| toString (i * 55)
+                        , Svg.Attributes.y <| toString (35)
+                        , Svg.Attributes.fill (rgbColor Color.yellow)
+                        , pulseOpacity time
+                        ]
+                        [ Svg.text "[ Press Enter to Execute ]" ]
+                else
+                    Svg.text ""
+
+            _ ->
+                Svg.text ""
 
 
 viewInstruction : Int -> Maybe Instruction -> Html Msg

@@ -18,6 +18,7 @@ type alias Model =
 
 type Mode
     = Playing
+    | Executing Int Time
     | Paused
     | Success
     | Failed
@@ -63,6 +64,30 @@ type Instruction
 type alias Function =
     { instructions : List (Maybe Instruction)
     }
+
+
+readyToExecute : Function -> Bool
+readyToExecute fn =
+    List.all (\x -> x /= Nothing) fn.instructions
+
+
+replaceFirstNothing : Instruction -> Function -> Function
+replaceFirstNothing instruction fn =
+    let
+        replace x ( replaced, remain ) =
+            if replaced then
+                ( replaced, x :: remain )
+            else if x == Nothing then
+                ( True, Just instruction :: remain )
+            else
+                ( replaced, x :: remain )
+
+        newInstructions =
+            List.foldl replace ( False, [] ) fn.instructions
+                |> Tuple.second
+                |> List.reverse
+    in
+        { fn | instructions = newInstructions }
 
 
 overlapping : Coords -> List Coords -> Bool
@@ -135,10 +160,10 @@ initialModel =
         selectable []
             []
             { instructions =
-                [ Just <| Move Left
-                , Just <| Move Up
-                , Just <| Move Right
-                , Just <| Move Up
+                [ Nothing
+                , Nothing
+                , Nothing
+                , Nothing
                 , Nothing
                 ]
             }

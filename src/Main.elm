@@ -29,22 +29,29 @@ main =
             (\model ->
                 Sub.batch
                     [ Window.resizes WindowResize
-                    , if model.mode == Playing then
-                        AnimationFrame.times Tick
-                      else
-                        Sub.none
+                    , case model.mode of
+                        Playing ->
+                            AnimationFrame.times Tick
+
+                        Executing _ _ ->
+                            AnimationFrame.times Tick
+
+                        _ ->
+                            Sub.none
                     , Keyboard.downs
                         (\code ->
                             if code == keyboard.left then
-                                Move Left
+                                AddInstruction <| Move Left
                             else if code == keyboard.right then
-                                Move Right
+                                AddInstruction <| Move Right
                             else if code == keyboard.up then
-                                Move Up
+                                AddInstruction <| Move Up
                             else if code == keyboard.down then
-                                Move Down
+                                AddInstruction <| Move Down
                             else if code == keyboard.esc then
                                 TogglePause
+                            else if code == keyboard.enter then
+                                Execute
                             else
                                 NoOp
                         )
@@ -58,7 +65,7 @@ type Msg
     | RemoveInstruction Int Int
     | Select Int
     | Execute
-    | Move Direction
+    | ExecuteNextStep
     | TogglePause
     | Fail
     | NoOp
@@ -80,7 +87,7 @@ keyboard =
     , s = 83
     , space = 32
     , esc = 27
-    , enter = 27
+    , enter = 13
     , tab = 9
     }
 
@@ -92,7 +99,18 @@ update msg model =
             ( model, Cmd.none )
 
         AddInstruction instruction ->
-            ( model, Cmd.none )
+            let
+                oldRegisters =
+                    model.registers
+
+                revisedRegisters =
+                    { oldRegisters
+                        | current = replaceFirstNothing instruction model.registers.current
+                    }
+            in
+                ( { model | registers = revisedRegisters }
+                , Cmd.none
+                )
 
         RemoveInstruction fnIndex registerIndex ->
             ( model, Cmd.none )
@@ -101,36 +119,99 @@ update msg model =
             ( model, Cmd.none )
 
         Execute ->
-            ( model, Cmd.none )
+            if readyToExecute model.registers.current then
+                update ExecuteNextStep
+                    { model
+                        | mode = Executing 0 model.time
+                    }
+            else
+                ( model, Cmd.none )
 
         Fail ->
             ( model, Cmd.none )
 
-        Move direction ->
-            let
-                newPath =
-                    move direction model.path
-            in
-                if winning newPath model.items then
+        ExecuteNextStep ->
+            case model.mode of
+                Executing i _ ->
+                    let
+                        maybeInstruction =
+                            List.drop i model.registers.current.instructions
+                                |> List.head
+                                |> (\x ->
+                                        case x of
+                                            Nothing ->
+                                                Nothing
+
+                                            Just x ->
+                                                x
+                                   )
+                    in
+                        case maybeInstruction of
+                            Nothing ->
+                                if winning model.path model.items then
+                                    ( { model
+                                        | mode = Success
+                                      }
+                                    , Cmd.none
+                                    )
+                                else
+                                    ( { model
+                                        | mode = Failed
+                                      }
+                                    , Cmd.none
+                                    )
+
+                            Just instruction ->
+                                case instruction of
+                                    Move direction ->
+                                        let
+                                            newPath =
+                                                move direction model.path
+                                        in
+                                            if winning newPath model.items then
+                                                ( { model
+                                                    | path = newPath
+                                                    , mode = Success
+                                                  }
+                                                , Cmd.none
+                                                )
+                                            else
+                                                ( { model
+                                                    | path = newPath
+                                                    , mode = Executing (i + 1) model.time
+                                                  }
+                                                , Cmd.none
+                                                )
+
+                _ ->
                     ( { model
-                        | path = newPath
-                        , mode = Success
-                      }
-                    , Cmd.none
-                    )
-                else
-                    ( { model
-                        | path = newPath
+                        | mode = Failed
                       }
                     , Cmd.none
                     )
 
         Tick time ->
-            ( { model
-                | time = time
-              }
-            , Cmd.none
-            )
+            let
+                executeNextStep =
+                    case model.mode of
+                        Executing _ lastStepTime ->
+                            time - lastStepTime > 0.1 * Time.second
+
+                        _ ->
+                            False
+            in
+                if executeNextStep then
+                    update
+                        ExecuteNextStep
+                        { model
+                            | time = time
+                        }
+                else
+                    ( { model
+                        | time = time
+                      }
+                    , Cmd.none
+                    )
 
         TogglePause ->
             ( { model
@@ -315,12 +396,29 @@ viewLevel { path, time, grid, registers, items } =
             [ Svg.Attributes.class "svg-base"
             ]
             [ blurs
+            , defs
             , Svg.g [] (List.map (viewItem grid renderedPath time) items)
               --, viewMap level.map grid time
-            , viewRegisters registers grid
+            , viewRegisters registers grid time
               --, viewFunctionUI allInstructions
             , viewPath path time grid
             ]
+
+
+defs =
+    Svg.defs []
+        [ Svg.marker
+            [ Svg.Attributes.id "arrow"
+            , Svg.Attributes.markerWidth "10"
+            , Svg.Attributes.markerHeight "10"
+            , Svg.Attributes.orient "auto"
+            , Svg.Attributes.refX "0"
+            , Svg.Attributes.refY "1"
+            , Svg.Attributes.markerUnits "strokeWidth"
+            ]
+            [ Svg.path [ Svg.Attributes.d "M0,0 L0,2 L1.5,1 z", Svg.Attributes.fill "#fff" ] []
+            ]
+        ]
 
 
 blurs =
@@ -402,8 +500,8 @@ viewItem grid renderedPath currentTime item =
                     ]
 
 
-viewRegisters : Selectable Function -> Grid -> Html Msg
-viewRegisters selectableRegisters grid =
+viewRegisters : Selectable Function -> Grid -> Time -> Html Msg
+viewRegisters selectableRegisters grid currentTime =
     Svg.g []
         (Selectable.indexedMapLocation
             (\pos i register ->
@@ -415,7 +513,7 @@ viewRegisters selectableRegisters grid =
                         Svg.g
                             [ Grid.transform grid 2 1
                             ]
-                            (List.indexedMap viewInstruction register.instructions)
+                            (viewEnterToExecute register.instructions currentTime :: List.indexedMap viewInstruction register.instructions)
 
                     Selectable.Upcoming ->
                         square (Grid.posY grid 3) (Grid.posY grid 20)
@@ -424,12 +522,30 @@ viewRegisters selectableRegisters grid =
         )
 
 
+viewEnterToExecute : List (Maybe Instruction) -> Time -> Html Msg
+viewEnterToExecute insts time =
+    let
+        i =
+            List.length insts
+    in
+        if List.all (\x -> x /= Nothing) insts then
+            Svg.text_
+                [ Svg.Attributes.x <| toString (i * 55)
+                , Svg.Attributes.y <| toString (35)
+                , Svg.Attributes.fill (rgbColor Color.yellow)
+                , pulseOpacity time
+                ]
+                [ Svg.text "[ Press Enter to Execute ]" ]
+        else
+            Svg.text ""
+
+
 viewInstruction : Int -> Maybe Instruction -> Html Msg
 viewInstruction i mInstruction =
     case mInstruction of
         Nothing ->
             Svg.circle
-                [ Svg.Attributes.cx <| toString (i * 50)
+                [ Svg.Attributes.cx <| toString (i * 55)
                 , Svg.Attributes.cy <| toString (30)
                 , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
                 , Svg.Attributes.stroke (rgbColor Color.black)
@@ -439,11 +555,11 @@ viewInstruction i mInstruction =
                 []
 
         Just instruction ->
-            case instruction of
-                Model.Move Left ->
+            let
+                node deltaX deltaY =
                     Svg.g []
                         [ Svg.circle
-                            [ Svg.Attributes.cx <| toString (i * 50)
+                            [ Svg.Attributes.cx <| toString (i * 55)
                             , Svg.Attributes.cy <| toString (30)
                             , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
                             , Svg.Attributes.stroke (rgbColor Color.black)
@@ -451,70 +567,30 @@ viewInstruction i mInstruction =
                             , Svg.Attributes.r "30"
                             ]
                             []
-                        , Svg.text_
-                            [ Svg.Attributes.stroke (rgbColor Color.white)
-                            , Svg.Attributes.x <| toString (i * 50)
-                            , Svg.Attributes.y <| toString (30)
+                        , Svg.line
+                            [ Svg.Attributes.x1 <| toString <| (i * 55) + deltaX
+                            , Svg.Attributes.y1 <| toString (30 + deltaY)
+                            , Svg.Attributes.x2 <| toString (i * 55)
+                            , Svg.Attributes.y2 <| toString (30)
+                            , Svg.Attributes.stroke "#fff"
+                            , Svg.Attributes.strokeWidth "10"
+                            , Svg.Attributes.markerEnd "url(#arrow)"
                             ]
-                            [ text "left" ]
+                            []
                         ]
+            in
+                case instruction of
+                    Model.Move Left ->
+                        node 8 0
 
-                Model.Move Right ->
-                    Svg.g []
-                        [ Svg.circle
-                            [ Svg.Attributes.cx <| toString (i * 50)
-                            , Svg.Attributes.cy <| toString (30)
-                            , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
-                            , Svg.Attributes.stroke (rgbColor Color.black)
-                            , Svg.Attributes.strokeWidth "5"
-                            , Svg.Attributes.r "30"
-                            ]
-                            []
-                        , Svg.text_
-                            [ Svg.Attributes.stroke (rgbColor Color.white)
-                            , Svg.Attributes.x <| toString (i * 50)
-                            , Svg.Attributes.y <| toString (30)
-                            ]
-                            [ text "right" ]
-                        ]
+                    Model.Move Right ->
+                        node (-8) 0
 
-                Model.Move Up ->
-                    Svg.g []
-                        [ Svg.circle
-                            [ Svg.Attributes.cx <| toString (i * 50)
-                            , Svg.Attributes.cy <| toString (30)
-                            , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
-                            , Svg.Attributes.stroke (rgbColor Color.black)
-                            , Svg.Attributes.strokeWidth "5"
-                            , Svg.Attributes.r "30"
-                            ]
-                            []
-                        , Svg.text_
-                            [ Svg.Attributes.stroke (rgbColor Color.white)
-                            , Svg.Attributes.x <| toString (i * 50)
-                            , Svg.Attributes.y <| toString (30)
-                            ]
-                            [ text "up" ]
-                        ]
+                    Model.Move Up ->
+                        node 0 8
 
-                Model.Move Down ->
-                    Svg.g []
-                        [ Svg.circle
-                            [ Svg.Attributes.cx <| toString (i * 30)
-                            , Svg.Attributes.cy <| toString (30)
-                            , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
-                            , Svg.Attributes.stroke (rgbColor Color.black)
-                            , Svg.Attributes.strokeWidth "5"
-                            , Svg.Attributes.r "30"
-                            ]
-                            []
-                        , Svg.text_
-                            [ Svg.Attributes.stroke (rgbColor Color.white)
-                            , Svg.Attributes.x <| toString (i * 50)
-                            , Svg.Attributes.y <| toString (30)
-                            ]
-                            [ text "down" ]
-                        ]
+                    Model.Move Down ->
+                        node 0 (-8)
 
 
 viewFunctionUI : List Instruction -> Html Msg

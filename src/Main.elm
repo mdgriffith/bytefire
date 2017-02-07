@@ -204,7 +204,10 @@ update msg model =
                                             )
 
                                         (StackLevel fnIndex step) :: remain ->
-                                            { model | mode = Executing step model.time }
+                                            { model
+                                                | mode = Executing step model.time
+                                                , stack = remain
+                                            }
                                                 |> update (Select fnIndex)
                                                 |> andThen ExecuteNextStep
 

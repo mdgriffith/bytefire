@@ -100,7 +100,7 @@ renderPath (Path start moves) =
                 ( newPoint, newPoint :: rendered )
 
         points =
-            Tuple.second <| List.foldl move ( start, [] ) moves
+            List.reverse <| Tuple.second <| List.foldl move ( start, [] ) moves
     in
         start :: points
 

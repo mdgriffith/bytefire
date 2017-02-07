@@ -256,7 +256,7 @@ viewGrid grid =
 
 
 viewPath : Path -> Time -> Grid -> Html Msg
-viewPath (Path start moves) currentTime grid =
+viewPath path currentTime grid =
     let
         point color location =
             Svg.g [ pulseOpacity currentTime ]
@@ -279,37 +279,27 @@ viewPath (Path start moves) currentTime grid =
                     []
                 ]
 
-        move direction ( { x, y }, rendered ) =
-            let
-                newPoint =
-                    case direction of
-                        Left ->
-                            { x = x - 1
-                            , y = y
-                            }
+        rendered =
+            renderPath path
 
-                        Right ->
-                            { x = x + 1
-                            , y = y
-                            }
+        points =
+            List.map (point Color.yellow) rendered
 
-                        Up ->
-                            { x = x
-                            , y = y - 1
-                            }
+        asPointString coords =
+            List.map (\{ x, y } -> toString (Grid.posX grid x) ++ "," ++ toString (Grid.posY grid y)) coords
+                |> String.join " "
 
-                        Down ->
-                            { x = x
-                            , y = y + 1
-                            }
-            in
-                ( newPoint, point Color.blue newPoint :: rendered )
-
-        remainingPoints =
-            Tuple.second <| List.foldl move ( start, [] ) moves
+        track =
+            Svg.polyline
+                [ Svg.Attributes.points (asPointString rendered)
+                , Svg.Attributes.strokeDasharray "5, 5"
+                , Svg.Attributes.stroke (rgbColor Color.yellow)
+                , Svg.Attributes.fill "rgba(0,0,0,0.0)"
+                ]
+                []
     in
         Svg.g []
-            (point Color.yellow start :: remainingPoints)
+            (track :: points)
 
 
 
@@ -377,7 +367,7 @@ viewItem grid renderedPath currentTime item =
                         , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
                         , Svg.Attributes.fill (rgbColor Color.black)
                         , Svg.Attributes.stroke (rgbColor Color.yellow)
-                        , Svg.Attributes.r "8"
+                        , Svg.Attributes.r "12"
                         , Svg.Attributes.filter "url(#blurMe)"
                         ]
                         []
@@ -386,7 +376,7 @@ viewItem grid renderedPath currentTime item =
                         , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
                         , Svg.Attributes.fill (rgbColor Color.black)
                         , Svg.Attributes.stroke (rgbColor Color.black)
-                        , Svg.Attributes.r "5"
+                        , Svg.Attributes.r "8"
                         ]
                         []
                     ]

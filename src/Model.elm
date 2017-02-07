@@ -116,9 +116,9 @@ replaceFirstNothing instruction fn =
         { fn | instructions = newInstructions }
 
 
-overlapping : Coords -> List Coords -> Bool
+overlapping : Coords -> List { a | x : Int, y : Int } -> Bool
 overlapping coord all =
-    List.any ((==) coord) all
+    List.any (\point -> point.x == coord.x && point.y == coord.y) all
 
 
 renderPath : Path -> List Coords
@@ -169,22 +169,22 @@ resetPath (Path start _) =
 initialModel : Model
 initialModel =
     { mode = Playing
-    , path = Path { x = 20, y = 10 } []
+    , path = Path { x = 5, y = 5 } []
     , items =
-        [ { x = 21
-          , y = 10
+        [ { x = 6
+          , y = 5
           , kind = Node
           }
-        , { x = 23
-          , y = 12
+        , { x = 6
+          , y = 6
           , kind = Node
           }
-        , { x = 21
-          , y = 11
+        , { x = 8
+          , y = 7
           , kind = Node
           }
         ]
-    , grid = Grid.init 30 30 1000 600
+    , grid = Grid.init 60 60 1000 600
     , running = True
     , time = 0
     , registers =

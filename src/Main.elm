@@ -314,7 +314,7 @@ body {
     left:0;
     width:100%;
     height:100%;
-    background-color: rgba(1,1,1,0.5);
+    background-color: rgba(1,1,1,0);
 }
 .centered {
    position:absolute;
@@ -340,20 +340,20 @@ view model =
         , case model.mode of
             Paused ->
                 div [ class "overlay" ]
-                    [ div [ class "centered" ]
-                        [ text "Paused" ]
+                    [ div [ class "centered", style [ ( "color", rgbColor Color.red ) ] ]
+                        [ text "[ Paused ]" ]
                     ]
 
             Success ->
                 div [ class "overlay" ]
-                    [ div [ class "centered" ]
-                        [ text "Success" ]
+                    [ div [ class "centered", style [ ( "color", rgbColor Color.green ) ] ]
+                        [ text "[ Success ]" ]
                     ]
 
             Failed _ ->
                 div [ class "overlay" ]
-                    [ div [ class "centered" ]
-                        [ text "Failure" ]
+                    [ div [ class "centered", style [ ( "color", rgbColor Color.red ) ] ]
+                        [ text "[ Failure ]" ]
                     ]
 
             _ ->
@@ -380,35 +380,66 @@ viewGrid grid =
         ]
 
 
-viewPath : Path -> Time -> Grid -> Html Msg
-viewPath path currentTime grid =
+viewPath : List Item -> Path -> Time -> Grid -> Html Msg
+viewPath items path currentTime grid =
     let
-        point color location =
-            Svg.g [ pulseOpacity currentTime ]
-                [ Svg.circle
-                    [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
-                    , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
-                    , Svg.Attributes.fill (rgbColor color)
-                    , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
-                    , Svg.Attributes.r "5"
-                    , Svg.Attributes.filter "url(#blurMe)"
+        nodes =
+            List.filter (\i -> i.kind == Node) items
+
+        point color starting location =
+            if overlapping { x = location.x, y = location.y } nodes then
+                Svg.g [ pulseOpacity currentTime ]
+                    [ Svg.circle
+                        [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
+                        , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
+                        , Svg.Attributes.stroke (rgbColor color)
+                        , Svg.Attributes.strokeWidth "2"
+                        , Svg.Attributes.fill "black"
+                        , Svg.Attributes.r <| toString <| dotSizes.item + shadowDelta.captured
+                          --if starting then
+                          --    "9"
+                          --else
+                          --    "6"
+                        ]
+                        []
                     ]
-                    []
-                , Svg.circle
-                    [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
-                    , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
-                    , Svg.Attributes.fill (rgbColor color)
-                    , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
-                    , Svg.Attributes.r "3"
+            else
+                Svg.g [ pulseOpacity currentTime ]
+                    [ Svg.circle
+                        [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
+                        , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
+                        , Svg.Attributes.fill (rgbColor color)
+                        , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
+                        , Svg.Attributes.r <|
+                            if starting then
+                                toString <| dotSizes.cursor + 2
+                            else
+                                toString <| dotSizes.item + 2
+                        , Svg.Attributes.filter "url(#blurMe)"
+                        ]
+                        []
+                    , Svg.circle
+                        [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
+                        , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
+                        , Svg.Attributes.fill (rgbColor color)
+                        , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
+                        , Svg.Attributes.r <|
+                            if starting then
+                                toString <| dotSizes.cursor
+                            else
+                                toString <| dotSizes.item
+                        ]
+                        []
                     ]
-                    []
-                ]
 
         rendered =
             renderPath path
 
+        total =
+            List.length rendered - 1
+
         points =
-            List.map (point Color.yellow) rendered
+            List.indexedMap (\i p -> point Color.yellow (i == total) p) rendered
 
         asPointString coords =
             List.map (\{ x, y } -> toString (Grid.posX grid x) ++ "," ++ toString (Grid.posY grid y)) coords
@@ -441,11 +472,11 @@ viewLevel { path, time, grid, registers, items, mode } =
             ]
             [ blurs
             , defs
+            , viewPath items path time grid
             , Svg.g [] (List.map (viewItem grid renderedPath time) items)
               --, viewMap level.map grid time
             , viewRegisters mode registers grid time
               --, viewFunctionUI allInstructions
-            , viewPath path time grid
             ]
 
 
@@ -498,50 +529,42 @@ winning path items =
         List.all (\node -> overlapping { x = node.x, y = node.y } rendered) nodes
 
 
+dotSizes =
+    { cursor = 8
+    , item = 4
+    }
+
+
+shadowDelta =
+    { cursor = 3
+    , item = 3
+    , captured = 4
+    }
+
+
 viewItem : Grid -> List Coords -> Time -> Item -> Html Msg
 viewItem grid renderedPath currentTime item =
     case item.kind of
         Node ->
-            if overlapping { x = item.x, y = item.y } renderedPath then
-                Svg.g [ pulseOpacity currentTime ]
-                    [ Svg.circle
-                        [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
-                        , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
-                        , Svg.Attributes.fill (rgbColor Color.black)
-                        , Svg.Attributes.stroke (rgbColor Color.yellow)
-                        , Svg.Attributes.r "12"
-                        , Svg.Attributes.filter "url(#blurMe)"
-                        ]
-                        []
-                    , Svg.circle
-                        [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
-                        , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
-                        , Svg.Attributes.fill (rgbColor Color.black)
-                        , Svg.Attributes.stroke (rgbColor Color.black)
-                        , Svg.Attributes.r "8"
-                        ]
-                        []
+            Svg.g [ pulseOpacity currentTime ]
+                [ Svg.circle
+                    [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
+                    , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
+                    , Svg.Attributes.fill (rgbColor Color.blue)
+                    , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
+                    , Svg.Attributes.r <| toString <| dotSizes.item + shadowDelta.item
+                    , Svg.Attributes.filter "url(#blurMe)"
                     ]
-            else
-                Svg.g [ pulseOpacity currentTime ]
-                    [ Svg.circle
-                        [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
-                        , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
-                        , Svg.Attributes.fill (rgbColor Color.green)
-                        , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
-                        , Svg.Attributes.r "5"
-                        , Svg.Attributes.filter "url(#blurMe)"
-                        ]
-                        []
-                    , Svg.circle
-                        [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
-                        , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
-                        , Svg.Attributes.fill (rgbColor Color.green)
-                        , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
-                        , Svg.Attributes.r "3"
-                        ]
-                        []
+                    []
+                , Svg.circle
+                    [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
+                    , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
+                    , Svg.Attributes.fill (rgbColor Color.blue)
+                    , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
+                    , Svg.Attributes.r <| toString <| dotSizes.item
                     ]
+                    []
+                ]
 
 
 viewRegisters : Mode -> Selectable Function -> Grid -> Time -> Html Msg

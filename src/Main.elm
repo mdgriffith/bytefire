@@ -37,30 +37,41 @@ main =
                             AnimationFrame.times Tick
                     , Keyboard.downs
                         (\code ->
-                            if code == keyboard.left then
-                                AddInstruction <| Move Left
-                            else if code == keyboard.right then
-                                AddInstruction <| Move Right
-                            else if code == keyboard.up then
-                                AddInstruction <| Move Up
-                            else if code == keyboard.down then
-                                AddInstruction <| Move Down
-                            else if code == keyboard.esc then
-                                TogglePause
-                            else if code == keyboard.enter then
-                                Execute
-                            else if code == keyboard.backspace then
-                                RemoveInstruction
-                            else if code == keyboard.one then
-                                AddInstruction <| Call One
-                            else if code == keyboard.two then
-                                AddInstruction <| Call Two
-                            else if code == keyboard.three then
-                                AddInstruction <| Call Three
-                            else if code == keyboard.space then
-                                Select (Selectable.nextCycledIndex model.registers)
-                            else
-                                NoOp
+                            case model.mode of
+                                Paused ->
+                                    if code == keyboard.esc then
+                                        TogglePause
+                                    else
+                                        NoOp
+
+                                Playing ->
+                                    if code == keyboard.left then
+                                        AddInstruction <| Move Left
+                                    else if code == keyboard.right then
+                                        AddInstruction <| Move Right
+                                    else if code == keyboard.up then
+                                        AddInstruction <| Move Up
+                                    else if code == keyboard.down then
+                                        AddInstruction <| Move Down
+                                    else if code == keyboard.esc then
+                                        TogglePause
+                                    else if code == keyboard.enter then
+                                        Execute
+                                    else if code == keyboard.backspace then
+                                        RemoveInstruction
+                                    else if code == keyboard.one then
+                                        AddInstruction <| Call One
+                                    else if code == keyboard.two then
+                                        AddInstruction <| Call Two
+                                    else if code == keyboard.three then
+                                        AddInstruction <| Call Three
+                                    else if code == keyboard.space then
+                                        Select (Selectable.nextCycledIndex model.registers)
+                                    else
+                                        NoOp
+
+                                _ ->
+                                    NoOp
                         )
                     ]
             )
@@ -84,6 +95,24 @@ type Msg
         }
 
 
+keyboard :
+    { a : number1
+    , backspace : number2
+    , d : number3
+    , down : number4
+    , enter : number5
+    , esc : Int
+    , left : number6
+    , one : number7
+    , right : number8
+    , s : number9
+    , tab : number10
+    , three : number11
+    , two : number12
+    , up : number13
+    , w : number14
+    , space : number
+    }
 keyboard =
     { left = 37
     , right = 39
@@ -348,6 +377,7 @@ update msg model =
                 )
 
 
+stylesheet : String
 stylesheet =
     """
 @import url("https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css");
@@ -522,6 +552,7 @@ viewPath items path currentTime grid =
 --viewLevel : Level -> Grid -> Time -> Html Msg
 
 
+viewLevel : Model -> Html Msg
 viewLevel ({ path, time, grid, registers, items, mode } as model) =
     let
         renderedPath =
@@ -532,51 +563,43 @@ viewLevel ({ path, time, grid, registers, items, mode } as model) =
             , width model.width
             , height model.height
             ]
-            [ blurs
-            , defs
+            [ Svg.filter
+                [ Svg.Attributes.id "blurMe"
+                , Svg.Attributes.x "-50%"
+                , Svg.Attributes.y "-50%"
+                , Svg.Attributes.width "200%"
+                , Svg.Attributes.height "200%"
+                ]
+                [ Svg.feGaussianBlur
+                    [ Svg.Attributes.in_ "SourceGraphic"
+                    , Svg.Attributes.stdDeviation "3.0"
+                    , Svg.Attributes.result "coloredBlur"
+                    ]
+                    []
+                , Svg.feMerge []
+                    [ Svg.feMergeNode [ Svg.Attributes.in_ "coloredBlur" ] []
+                      --, Svg.feMergeNode [ Svg.Attributes.in_ "SourceGraphic" ] []
+                    ]
+                ]
+            , Svg.defs []
+                [ Svg.marker
+                    [ Svg.Attributes.id "arrow"
+                    , Svg.Attributes.markerWidth "10"
+                    , Svg.Attributes.markerHeight "10"
+                    , Svg.Attributes.orient "auto"
+                    , Svg.Attributes.refX "0"
+                    , Svg.Attributes.refY "1"
+                    , Svg.Attributes.markerUnits "strokeWidth"
+                    ]
+                    [ Svg.path [ Svg.Attributes.d "M0,0 L0,2 L1.5,1 z", Svg.Attributes.fill "#fff" ] []
+                    ]
+                ]
             , viewPath items path time grid
             , Svg.g [] (List.map (viewItem grid renderedPath time) items)
               --, viewMap level.map grid time
             , viewRegisters mode registers grid time
               --, viewFunctionUI allInstructions
             ]
-
-
-defs =
-    Svg.defs []
-        [ Svg.marker
-            [ Svg.Attributes.id "arrow"
-            , Svg.Attributes.markerWidth "10"
-            , Svg.Attributes.markerHeight "10"
-            , Svg.Attributes.orient "auto"
-            , Svg.Attributes.refX "0"
-            , Svg.Attributes.refY "1"
-            , Svg.Attributes.markerUnits "strokeWidth"
-            ]
-            [ Svg.path [ Svg.Attributes.d "M0,0 L0,2 L1.5,1 z", Svg.Attributes.fill "#fff" ] []
-            ]
-        ]
-
-
-blurs =
-    Svg.filter
-        [ Svg.Attributes.id "blurMe"
-        , Svg.Attributes.x "-50%"
-        , Svg.Attributes.y "-50%"
-        , Svg.Attributes.width "200%"
-        , Svg.Attributes.height "200%"
-        ]
-        [ Svg.feGaussianBlur
-            [ Svg.Attributes.in_ "SourceGraphic"
-            , Svg.Attributes.stdDeviation "3.0"
-            , Svg.Attributes.result "coloredBlur"
-            ]
-            []
-        , Svg.feMerge []
-            [ Svg.feMergeNode [ Svg.Attributes.in_ "coloredBlur" ] []
-              --, Svg.feMergeNode [ Svg.Attributes.in_ "SourceGraphic" ] []
-            ]
-        ]
 
 
 winning : Path -> List Item -> Bool
@@ -591,12 +614,14 @@ winning path items =
         List.all (\node -> overlapping { x = node.x, y = node.y } rendered) nodes
 
 
+dotSizes : { cursor : Int, item : Int }
 dotSizes =
     { cursor = 8
     , item = 4
     }
 
 
+shadowDelta : { cursor : Int, item : Int, captured : Int }
 shadowDelta =
     { cursor = 3
     , item = 3

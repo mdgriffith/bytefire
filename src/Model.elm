@@ -7,6 +7,7 @@ import Time exposing (Time)
 
 type alias Model =
     { path : Path
+    , map : Map
     , items : List Item
     , registers : Selectable Function
     , grid : Grid
@@ -29,6 +30,14 @@ type Mode
     | Paused
     | Success
     | Failed Time
+
+
+type Map
+    = Map (List LineSegment)
+
+
+type LineSegment
+    = Seg Coords Coords
 
 
 type ItemType
@@ -127,7 +136,22 @@ replaceFirstNothing instruction fn =
 
 overlapping : Coords -> List { a | x : Int, y : Int } -> Bool
 overlapping coord all =
-    List.any (\point -> point.x == coord.x && point.y == coord.y) all
+    List.any (matching coord) all
+
+
+matching : { a | x : Int, y : Int } -> { b | x : Int, y : Int } -> Bool
+matching p1 p2 =
+    p1.x == p2.x && p1.y == p2.y
+
+
+overlappingSegment : LineSegment -> List LineSegment -> Bool
+overlappingSegment (Seg p1 p2) all =
+    List.any
+        (\(Seg point1 point2) ->
+            (matching p1 point1 && matching p2 point2)
+                || (matching p1 point2 && matching p2 point1)
+        )
+        all
 
 
 renderPath : Path -> List Coords
@@ -179,6 +203,18 @@ initialModel : Model
 initialModel =
     { mode = Playing
     , path = Path { x = 5, y = 5 } []
+    , map =
+        Map
+            [ Seg { x = 5, y = 5 } { x = 6, y = 5 }
+            , Seg { x = 6, y = 5 } { x = 6, y = 6 }
+            , Seg { x = 6, y = 6 } { x = 6, y = 7 }
+            , Seg { x = 6, y = 7 } { x = 7, y = 7 }
+            , Seg { x = 7, y = 7 } { x = 8, y = 7 }
+            , Seg { x = 8, y = 7 } { x = 9, y = 7 }
+            , Seg { x = 9, y = 7 } { x = 10, y = 7 }
+            , Seg { x = 10, y = 7 } { x = 11, y = 7 }
+            , Seg { x = 11, y = 7 } { x = 12, y = 7 }
+            ]
     , stack = []
     , items =
         [ { x = 6

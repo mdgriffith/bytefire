@@ -223,6 +223,12 @@ update msg model =
                                       }
                                     , Cmd.none
                                     )
+                                else if losing model.map model.path then
+                                    ( { model
+                                        | mode = Failed model.time
+                                      }
+                                    , Cmd.none
+                                    )
                                 else
                                     case model.stack of
                                         [] ->
@@ -251,6 +257,13 @@ update msg model =
                                                 ( { model
                                                     | path = newPath
                                                     , mode = Success
+                                                  }
+                                                , Cmd.none
+                                                )
+                                            else if losing model.map newPath then
+                                                ( { model
+                                                    | path = newPath
+                                                    , mode = Failed model.time
                                                   }
                                                 , Cmd.none
                                                 )
@@ -464,9 +477,9 @@ viewGrid modelWidth modelHeight grid =
                 Svg.circle
                     [ Svg.Attributes.cx <| toString x
                     , Svg.Attributes.cy <| toString y
-                    , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
+                    , Svg.Attributes.fill (rgbColor Color.charcoal)
                     , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
-                    , Svg.Attributes.r "2"
+                    , Svg.Attributes.r "3"
                       --, pulseOpacityOffset (toFloat (x + y)) currentTime
                     ]
                     []
@@ -548,8 +561,27 @@ viewPath items path currentTime grid =
             (track :: points)
 
 
+viewMap : Map -> Grid -> Html Msg
+viewMap (Map segments) grid =
+    let
+        renderedSegments =
+            List.map viewSegment segments
 
---viewLevel : Level -> Grid -> Time -> Html Msg
+        viewSegment (Seg p1 p2) =
+            Svg.line
+                [ Svg.Attributes.x1 <| toString <| Grid.posX grid p1.x
+                , Svg.Attributes.y1 <| toString <| Grid.posY grid p1.y
+                , Svg.Attributes.x2 <| toString <| Grid.posX grid p2.x
+                , Svg.Attributes.y2 <| toString <| Grid.posY grid p2.y
+                , Svg.Attributes.strokeDasharray "5, 5"
+                , Svg.Attributes.stroke (rgbColor Color.charcoal)
+                , Svg.Attributes.strokeWidth "2"
+                , Svg.Attributes.fill "rgba(0,0,0,0.0)"
+                ]
+                []
+    in
+        Svg.g []
+            (List.map viewSegment segments)
 
 
 viewLevel : Model -> Html Msg
@@ -594,9 +626,9 @@ viewLevel ({ path, time, grid, registers, items, mode } as model) =
                     [ Svg.path [ Svg.Attributes.d "M0,0 L0,2 L1.5,1 z", Svg.Attributes.fill "#fff" ] []
                     ]
                 ]
+            , viewMap model.map grid
             , viewPath items path time grid
             , Svg.g [] (List.map (viewItem grid renderedPath time) items)
-              --, viewMap level.map grid time
             , viewRegisters mode registers grid time
               --, viewFunctionUI allInstructions
             ]
@@ -612,6 +644,18 @@ winning path items =
             renderPath path
     in
         List.all (\node -> overlapping { x = node.x, y = node.y } rendered) nodes
+
+
+losing : Map -> Path -> Bool
+losing (Map segments) path =
+    let
+        rendered =
+            renderPath path
+
+        pathSegments =
+            List.map2 (Seg) rendered (List.drop 1 rendered)
+    in
+        List.all (\seg -> overlappingSegment seg segments) pathSegments
 
 
 dotSizes : { cursor : Int, item : Int }

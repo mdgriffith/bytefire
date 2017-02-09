@@ -14,6 +14,8 @@ type alias Model =
     , time : Time
     , mode : Mode
     , stack : List StackLevel
+    , width : Int
+    , height : Int
     }
 
 
@@ -197,6 +199,8 @@ initialModel =
           }
         ]
     , grid = Grid.init 60 60 1000 600
+    , width = 1000
+    , height = 600
     , running = True
     , time = 0
     , registers =
@@ -225,6 +229,8 @@ resizeGrid : Int -> Int -> Model -> Model
 resizeGrid width height model =
     { model
         | grid = Grid.resize width height model.grid
+        , width = width
+        , height = height
     }
 
 

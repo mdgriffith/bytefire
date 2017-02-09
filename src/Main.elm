@@ -359,9 +359,9 @@ body {
 
 }
 .svg-base {
-    width:100%;
-    height:100%;
     position:absolute;
+    left:0;
+    top:0;
     display:block;
 }
 .basic-square {
@@ -394,9 +394,9 @@ body {
 
 view : Model -> Html Msg
 view model =
-    div []
+    div [ width model.width, height model.height ]
         [ node "style" [] [ text stylesheet ]
-        , Html.Lazy.lazy viewGrid model.grid
+        , Html.Lazy.lazy3 viewGrid model.width model.height model.grid
         , viewLevel model
         , case model.mode of
             Paused ->
@@ -422,10 +422,12 @@ view model =
         ]
 
 
-viewGrid : Grid -> Html Msg
-viewGrid grid =
+viewGrid : Int -> Int -> Grid -> Html Msg
+viewGrid modelWidth modelHeight grid =
     Svg.svg
         [ Svg.Attributes.class "svg-base"
+        , width modelWidth
+        , height modelHeight
         ]
         [ Grid.view grid <|
             \( col, row ) ( x, y ) ->
@@ -520,13 +522,15 @@ viewPath items path currentTime grid =
 --viewLevel : Level -> Grid -> Time -> Html Msg
 
 
-viewLevel { path, time, grid, registers, items, mode } =
+viewLevel ({ path, time, grid, registers, items, mode } as model) =
     let
         renderedPath =
             renderPath path
     in
         Svg.svg
             [ Svg.Attributes.class "svg-base"
+            , width model.width
+            , height model.height
             ]
             [ blurs
             , defs

@@ -414,19 +414,20 @@ body {
     stroke-width:1;
 }
 .overlay {
-    position:absolute;
+    position:fixed;
     top:0;
     left:0;
     width:100%;
     height:100%;
     background-color: rgba(1,1,1,0);
+    font-size:30px;
 }
 .centered {
    position:absolute;
-   width:300px;
+   width:400px;
    height:60px;
    left:50%;
-   margin-left:-150px;
+   margin-left:-200px;
    top:50%;
    margin-top:-30px;
    text-align:center;
@@ -501,15 +502,7 @@ viewPath items path currentTime grid =
         point color starting location =
             if overlapping { x = location.x, y = location.y } nodes then
                 Svg.g []
-                    [ Svg.circle
-                        [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
-                        , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
-                        , Svg.Attributes.stroke (rgbColor color)
-                        , Svg.Attributes.strokeWidth "2"
-                        , Svg.Attributes.fill "black"
-                        , Svg.Attributes.r <| toString <| dotSizes.item + shadowDelta.captured
-                        ]
-                        []
+                    [ drawStar grid ( location.x, location.y ) 15 [ Svg.Attributes.fill (rgbColor Color.black), Svg.Attributes.stroke (rgbColor Color.yellow) ]
                     ]
             else
                 Svg.g [ pulseOpacity currentTime ]
@@ -679,10 +672,6 @@ shadowDelta =
     }
 
 
-
---drawStar : Grid -> ( Int, Int ) -> Float -> Svg.Svg Msg
-
-
 drawStar : Grid -> ( Int, Int ) -> Float -> List (Svg.Attribute msg) -> Svg.Svg msg
 drawStar grid pos size attrs =
     let
@@ -710,7 +699,6 @@ drawStar grid pos size attrs =
     in
         Svg.polyline
             ([ Svg.Attributes.points (asPointString points)
-             , Svg.Attributes.fill (rgbColor Color.yellow)
              ]
                 ++ attrs
             )
@@ -722,16 +710,14 @@ viewItem grid renderedPath currentTime item =
     case item.kind of
         Node ->
             Svg.g []
-                [ drawStar grid ( item.x, item.y ) 12 [ Svg.Attributes.filter "url(#blurMe)", pulseOpacity currentTime ]
-                , drawStar grid ( item.x, item.y ) 10 []
-                  --, Svg.circle
-                  --    [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
-                  --    , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
-                  --    , Svg.Attributes.fill (rgbColor Color.blue)
-                  --    , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
-                  --    , Svg.Attributes.r <| toString <| dotSizes.item
-                  --    ]
-                  --    []
+                [ drawStar grid
+                    ( item.x, item.y )
+                    12
+                    [ Svg.Attributes.fill (rgbColor Color.yellow)
+                    , Svg.Attributes.filter "url(#blurMe)"
+                    , pulseOpacity currentTime
+                    ]
+                , drawStar grid ( item.x, item.y ) 10 [ Svg.Attributes.fill (rgbColor Color.yellow) ]
                 ]
 
         Circle ->
@@ -813,7 +799,7 @@ viewRegisters mode selectableRegisters grid currentTime =
                 , Svg.Attributes.x <| toString -75
                 , Svg.Attributes.y <| toString 35
                 ]
-                [ Svg.text <| "F" ++ toString i ]
+                [ Svg.text <| "F" ++ toString (i + 1) ]
     in
         Svg.g []
             (Selectable.indexedMapLocation

@@ -42,6 +42,8 @@ type LineSegment
 
 type ItemType
     = Node
+    | Square
+    | Circle
 
 
 type alias Item =
@@ -207,8 +209,8 @@ initialModel =
         Map
             [ Seg { x = 5, y = 5 } { x = 6, y = 5 }
             , Seg { x = 6, y = 5 } { x = 6, y = 6 }
-            , Seg { x = 6, y = 6 } { x = 6, y = 7 }
-            , Seg { x = 6, y = 7 } { x = 7, y = 7 }
+            , Seg { x = 6, y = 6 } { x = 7, y = 6 }
+            , Seg { x = 7, y = 6 } { x = 7, y = 7 }
             , Seg { x = 7, y = 7 } { x = 8, y = 7 }
             , Seg { x = 8, y = 7 } { x = 9, y = 7 }
             , Seg { x = 9, y = 7 } { x = 10, y = 7 }
@@ -223,11 +225,11 @@ initialModel =
           }
         , { x = 6
           , y = 6
-          , kind = Node
+          , kind = Square
           }
         , { x = 8
           , y = 7
-          , kind = Node
+          , kind = Circle
           }
         , { x = 12
           , y = 7

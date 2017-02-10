@@ -17,6 +17,7 @@ import Keyboard
 import Model exposing (..)
 import Selectable exposing (Selectable)
 import Grid exposing (Grid, rgbColor)
+import List.Extra
 
 
 main : Program Never Model Msg
@@ -430,7 +431,12 @@ body {
    margin-top:-30px;
    text-align:center;
 }
-
+.fn-label {
+    font-size: 20px;
+}
+.selection-bracket {
+    font-size: 70px;
+}
 
 """
 
@@ -661,7 +667,7 @@ losing (Map segments) path =
 dotSizes : { cursor : Int, item : Int }
 dotSizes =
     { cursor = 8
-    , item = 4
+    , item = 5
     }
 
 
@@ -673,11 +679,63 @@ shadowDelta =
     }
 
 
+
+--drawStar : Grid -> ( Int, Int ) -> Float -> Svg.Svg Msg
+
+
+drawStar : Grid -> ( Int, Int ) -> Float -> List (Svg.Attribute msg) -> Svg.Svg msg
+drawStar grid pos size attrs =
+    let
+        ( xBase, yBase ) =
+            Grid.pos grid pos
+
+        outerPoints =
+            List.range 0 4
+                |> List.map (\x -> ( size, ((toFloat x / 5) * 2 * pi) - pi / 2 ))
+                |> List.map fromPolar
+                |> List.map (\( x, y ) -> ( x + toFloat xBase, y + toFloat yBase ))
+
+        innerPoints =
+            List.range 0 4
+                |> List.map (\x -> ( size / 2, (((toFloat x + 0.5) / 5) * 2 * pi) - pi / 2 ))
+                |> List.map fromPolar
+                |> List.map (\( x, y ) -> ( x + toFloat xBase, y + toFloat yBase ))
+
+        points =
+            List.Extra.interweave outerPoints innerPoints
+
+        asPointString coords =
+            List.map (\( x, y ) -> toString x ++ "," ++ toString y) coords
+                |> String.join " "
+    in
+        Svg.polyline
+            ([ Svg.Attributes.points (asPointString points)
+             , Svg.Attributes.fill (rgbColor Color.yellow)
+             ]
+                ++ attrs
+            )
+            []
+
+
 viewItem : Grid -> List Coords -> Time -> Item -> Html Msg
 viewItem grid renderedPath currentTime item =
     case item.kind of
         Node ->
-            Svg.g [ pulseOpacity currentTime ]
+            Svg.g []
+                [ drawStar grid ( item.x, item.y ) 12 [ Svg.Attributes.filter "url(#blurMe)", pulseOpacity currentTime ]
+                , drawStar grid ( item.x, item.y ) 10 []
+                  --, Svg.circle
+                  --    [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
+                  --    , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
+                  --    , Svg.Attributes.fill (rgbColor Color.blue)
+                  --    , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
+                  --    , Svg.Attributes.r <| toString <| dotSizes.item
+                  --    ]
+                  --    []
+                ]
+
+        Circle ->
+            Svg.g []
                 [ Svg.circle
                     [ Svg.Attributes.cx <| toString (Grid.posX grid item.x)
                     , Svg.Attributes.cy <| toString (Grid.posY grid item.y)
@@ -685,6 +743,7 @@ viewItem grid renderedPath currentTime item =
                     , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
                     , Svg.Attributes.r <| toString <| dotSizes.item + shadowDelta.item
                     , Svg.Attributes.filter "url(#blurMe)"
+                    , pulseOpacity currentTime
                     ]
                     []
                 , Svg.circle
@@ -697,33 +756,89 @@ viewItem grid renderedPath currentTime item =
                     []
                 ]
 
+        Square ->
+            let
+                baseLen =
+                    10
+
+                len =
+                    toFloat baseLen
+
+                shadowLen =
+                    toFloat <| baseLen + shadowDelta.item
+
+                x =
+                    toFloat (Grid.posX grid item.x) - (len / 2)
+
+                y =
+                    toFloat (Grid.posX grid item.y) - (len / 2)
+
+                shadowX =
+                    (toFloat (Grid.posX grid item.x)) - (shadowLen / 2)
+
+                shadowY =
+                    (toFloat (Grid.posX grid item.y)) - (shadowLen / 2)
+            in
+                Svg.g []
+                    [ Svg.rect
+                        [ Svg.Attributes.x <| toString shadowX
+                        , Svg.Attributes.y <| toString shadowY
+                        , Svg.Attributes.fill (rgbColor Color.green)
+                        , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
+                        , Svg.Attributes.width <| toString <| shadowLen
+                        , Svg.Attributes.height <| toString <| shadowLen
+                        , Svg.Attributes.filter "url(#blurMe)"
+                        , pulseOpacity currentTime
+                        ]
+                        []
+                    , Svg.rect
+                        [ Svg.Attributes.x <| toString x
+                        , Svg.Attributes.y <| toString y
+                        , Svg.Attributes.fill (rgbColor Color.green)
+                        , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
+                        , Svg.Attributes.width <| toString <| len
+                        , Svg.Attributes.height <| toString <| len
+                        ]
+                        []
+                    ]
+
 
 viewRegisters : Mode -> Selectable Function -> Grid -> Time -> Html Msg
 viewRegisters mode selectableRegisters grid currentTime =
-    Svg.g []
-        (Selectable.indexedMapLocation
-            (\pos i register ->
-                case pos of
-                    Selectable.Past ->
-                        Svg.g
-                            [ Grid.transform grid 2 (i + 1)
-                            ]
-                            (List.indexedMap viewInstruction register.instructions)
+    let
+        label i =
+            Svg.text_
+                [ Svg.Attributes.fill "white"
+                , Svg.Attributes.class "fn-label"
+                , Svg.Attributes.x <| toString -75
+                , Svg.Attributes.y <| toString 35
+                ]
+                [ Svg.text <| "F" ++ toString i ]
+    in
+        Svg.g []
+            (Selectable.indexedMapLocation
+                (\pos i register ->
+                    case pos of
+                        Selectable.Past ->
+                            Svg.g
+                                [ Grid.transform grid 2 (i + 1)
+                                ]
+                                (label i :: List.indexedMap viewInstruction register.instructions)
 
-                    Selectable.Current ->
-                        Svg.g
-                            [ Grid.transform grid 2 (i + 1)
-                            ]
-                            (viewEnterToExecute mode register.instructions currentTime :: List.indexedMap viewInstruction register.instructions)
+                        Selectable.Current ->
+                            Svg.g
+                                [ Grid.transform grid 2 (i + 1)
+                                ]
+                                (label i :: viewEnterToExecute mode register.instructions currentTime :: List.indexedMap viewInstruction register.instructions)
 
-                    Selectable.Upcoming ->
-                        Svg.g
-                            [ Grid.transform grid 2 (i + 1)
-                            ]
-                            (List.indexedMap viewInstruction register.instructions)
+                        Selectable.Upcoming ->
+                            Svg.g
+                                [ Grid.transform grid 2 (i + 1)
+                                ]
+                                (label i :: List.indexedMap viewInstruction register.instructions)
+                )
+                selectableRegisters
             )
-            selectableRegisters
-        )
 
 
 viewEnterToExecute : Mode -> List (Maybe Instruction) -> Time -> Html Msg
@@ -755,18 +870,18 @@ viewEnterToExecute mode insts time =
                     Svg.g []
                         [ Svg.text_
                             [ Svg.Attributes.x <| toString <| (i * 55) - 40
-                            , Svg.Attributes.y <| toString 45
+                            , Svg.Attributes.y <| toString 47
                             , Svg.Attributes.fill (rgbColor Color.yellow)
                             , pulseOpacity time
-                            , Html.Attributes.style [ ( "font-size", "70" ) ]
+                            , Svg.Attributes.class "selection-bracket"
                             ]
                             [ Svg.text "]" ]
                         , Svg.text_
                             [ Svg.Attributes.x <| toString -55
-                            , Svg.Attributes.y <| toString 45
+                            , Svg.Attributes.y <| toString 47
                             , Svg.Attributes.fill (rgbColor Color.yellow)
                             , pulseOpacity time
-                            , Html.Attributes.style [ ( "font-size", "70" ) ]
+                            , Svg.Attributes.class "selection-bracket"
                             ]
                             [ Svg.text "[" ]
                         ]

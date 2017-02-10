@@ -29,7 +29,13 @@ type Mode
     | Executing Int Time
     | Paused
     | Success
-    | Failed Time
+    | Failed Time Why
+
+
+type Why
+    = StackOverflow
+    | OutOfBounds
+    | NoInstructions
 
 
 type Map

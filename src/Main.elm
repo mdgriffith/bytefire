@@ -226,7 +226,7 @@ update msg model =
                                     )
                                 else if losing model.map model.path then
                                     ( { model
-                                        | mode = Failed model.time
+                                        | mode = Failed model.time OutOfBounds
                                       }
                                     , Cmd.none
                                     )
@@ -234,7 +234,7 @@ update msg model =
                                     case model.stack of
                                         [] ->
                                             ( { model
-                                                | mode = Failed model.time
+                                                | mode = Failed model.time NoInstructions
                                               }
                                             , Cmd.none
                                             )
@@ -264,7 +264,7 @@ update msg model =
                                             else if losing model.map newPath then
                                                 ( { model
                                                     | path = newPath
-                                                    , mode = Failed model.time
+                                                    , mode = Failed model.time OutOfBounds
                                                   }
                                                 , Cmd.none
                                                 )
@@ -294,7 +294,7 @@ update msg model =
                                         in
                                             if List.length model.stack > 5 then
                                                 ( { model
-                                                    | mode = Failed model.time
+                                                    | mode = Failed model.time StackOverflow
                                                   }
                                                 , Cmd.none
                                                 )
@@ -310,7 +310,7 @@ update msg model =
 
                 _ ->
                     ( { model
-                        | mode = Failed model.time
+                        | mode = Failed model.time NoInstructions
                       }
                     , Cmd.none
                     )
@@ -340,8 +340,8 @@ update msg model =
                             , Cmd.none
                             )
 
-                    Failed failTime ->
-                        if time - failTime > 1.0 * Time.second then
+                    Failed failTime _ ->
+                        if time - failTime > 10.0 * Time.second then
                             update
                                 Reboot
                                 { model
@@ -424,10 +424,10 @@ body {
 }
 .centered {
    position:absolute;
-   width:400px;
+   width:1000px;
    height:60px;
    left:50%;
-   margin-left:-200px;
+   margin-left:-500px;
    top:50%;
    margin-top:-30px;
    text-align:center;
@@ -461,10 +461,10 @@ view model =
                         [ text "[ Success ]" ]
                     ]
 
-            Failed _ ->
+            Failed _ reason ->
                 div [ class "overlay" ]
                     [ div [ class "centered", style [ ( "color", rgbColor Color.red ) ] ]
-                        [ text "[ Failure...Rebooting ]" ]
+                        [ text <| "[ Failure, " ++ toString reason ++ "...Rebooting ]" ]
                     ]
 
             _ ->
@@ -513,9 +513,9 @@ viewPath items path currentTime grid =
                         , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
                         , Svg.Attributes.r <|
                             if starting then
-                                toString <| dotSizes.cursor + 2
+                                toString <| dotSizes.cursor
                             else
-                                toString <| dotSizes.item + 2
+                                toString <| dotSizes.item
                         , Svg.Attributes.filter "url(#blurMe)"
                         ]
                         []
@@ -526,9 +526,9 @@ viewPath items path currentTime grid =
                         , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
                         , Svg.Attributes.r <|
                             if starting then
-                                toString <| dotSizes.cursor
+                                toString <| dotSizes.cursor - 2
                             else
-                                toString <| dotSizes.item
+                                toString <| dotSizes.item - 2
                         ]
                         []
                     ]
@@ -654,7 +654,7 @@ losing (Map segments) path =
         pathSegments =
             List.map2 (Seg) rendered (List.drop 1 rendered)
     in
-        List.all (\seg -> overlappingSegment seg segments) pathSegments
+        not <| List.all (\seg -> overlappingSegment seg segments) pathSegments
 
 
 dotSizes : { cursor : Int, item : Int }
@@ -697,7 +697,7 @@ drawStar grid pos size attrs =
             List.map (\( x, y ) -> toString x ++ "," ++ toString y) coords
                 |> String.join " "
     in
-        Svg.polyline
+        Svg.polygon
             ([ Svg.Attributes.points (asPointString points)
              ]
                 ++ attrs

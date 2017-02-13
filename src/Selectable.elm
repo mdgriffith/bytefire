@@ -14,6 +14,11 @@ type Loc
     | Upcoming
 
 
+length : Selectable a -> Int
+length { past, current, upcoming } =
+    List.length past + 1 + List.length upcoming
+
+
 select : Int -> Selectable a -> Selectable a
 select i ({ past, current, upcoming } as x) =
     let

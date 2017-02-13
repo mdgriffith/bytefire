@@ -36,10 +36,7 @@ resize actualWidth actualHeight (Grid grid) =
         }
 
 
-
---view : Grid -> () -> Svg msg
-
-
+view : Grid -> (( Int, Int ) -> ( Int, Int ) -> Svg msg) -> Svg msg
 view (Grid grid) fn =
     let
         coords =
@@ -99,6 +96,15 @@ type Vertical
     | VCenter
 
 
+type alias Anchor =
+    ( Vertical, Horizontal )
+
+
+topRight : Anchor
+topRight =
+    ( Top, Right )
+
+
 pos : Grid -> ( Int, Int ) -> ( Int, Int )
 pos (Grid grid) ( x, y ) =
     ( x * grid.columnWidth, y * grid.rowHeight )
@@ -107,6 +113,37 @@ pos (Grid grid) ( x, y ) =
 transform : Grid -> Int -> Int -> Svg.Attribute msg
 transform grid x y =
     Svg.Attributes.transform <| "translate(" ++ toString (posX grid x) ++ "," ++ toString (posY grid y) ++ ")"
+
+
+transformFrom : Grid -> Anchor -> Int -> Int -> Svg.Attribute msg
+transformFrom (Grid grid) anchor xDelta yDelta =
+    let
+        ( v, h ) =
+            anchor
+
+        y =
+            case v of
+                Top ->
+                    0 + yDelta
+
+                Bottom ->
+                    grid.rows - yDelta
+
+                VCenter ->
+                    (grid.rows // 2) + yDelta
+
+        x =
+            case h of
+                Left ->
+                    0 + xDelta
+
+                Right ->
+                    grid.columns - xDelta
+
+                HCenter ->
+                    (grid.columns // 2) + xDelta
+    in
+        Svg.Attributes.transform <| "translate(" ++ toString (posX (Grid grid) x) ++ "," ++ toString (posY (Grid grid) y) ++ ")"
 
 
 posX : Grid -> Int -> Int

@@ -10,6 +10,7 @@ import AnimationFrame
 import Html exposing (..)
 import Html.Lazy
 import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 import Svg
 import Svg.Attributes
 import Color
@@ -459,6 +460,9 @@ body {
 .selection-bracket {
     font-size: 70px;
 }
+.instruction-control {
+    cursor: pointer;
+}
 
 """
 
@@ -469,6 +473,7 @@ view model =
         [ node "style" [] [ text stylesheet ]
         , Html.Lazy.lazy3 viewGrid model.width model.height model.grid
         , viewLevel model
+        , viewControls (Selectable.length model.registers) model.width model.height model.grid
         , case model.mode of
             Paused ->
                 div [ class "overlay" ]
@@ -912,6 +917,29 @@ viewHint mode insts time =
 
             _ ->
                 Svg.text ""
+
+
+viewControls : Int -> Int -> Int -> Grid -> Html Msg
+viewControls count modelWidth modelHeight grid =
+    Svg.svg
+        [ Svg.Attributes.class "svg-base"
+        , width modelWidth
+        , height modelHeight
+        ]
+        [ Svg.g [] (List.indexedMap (viewInstructionControl grid) (callInstructions count))
+          --, div [] (List.map viewIfUi [Square, Circle])
+        ]
+
+
+viewInstructionControl : Grid -> Int -> Instruction -> Html Msg
+viewInstructionControl grid i instruction =
+    Svg.g
+        [ Grid.transformFrom grid Grid.topRight 1 (i + 1)
+        , Svg.Attributes.class "instruction-control"
+        , onClick (AddInstruction instruction)
+        ]
+        [ viewInstruction False 0 (Just instruction)
+        ]
 
 
 viewInstruction : Bool -> Int -> Maybe Instruction -> Html Msg

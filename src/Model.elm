@@ -74,6 +74,40 @@ type Direction
     | Down
 
 
+allInstructions : List Instruction
+allInstructions =
+    [ Move Up
+    , Move Right
+    , Move Down
+    , Move Left
+    , Call One
+    , Call Two
+    , Call Three
+    ]
+
+
+callInstructions : Int -> List Instruction
+callInstructions fnCount =
+    let
+        base =
+            [ Move Up
+            , Move Right
+            , Move Down
+            , Move Left
+            ]
+    in
+        if fnCount == 0 then
+            base
+        else if fnCount == 1 then
+            base ++ [ Call One ]
+        else if fnCount == 2 then
+            base ++ [ Call One, Call Two ]
+        else if fnCount == 3 then
+            base ++ [ Call One, Call Two, Call Three ]
+        else
+            base
+
+
 type Instruction
     = Move Direction
     | Call FnIndex
@@ -317,8 +351,3 @@ selectable past upcoming current =
     , current = current
     , upcoming = upcoming
     }
-
-
-allInstructions : List Instruction
-allInstructions =
-    []

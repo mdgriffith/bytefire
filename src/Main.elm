@@ -195,6 +195,7 @@ update msg model =
             update ExecuteNextStep
                 { model
                     | mode = Executing 0 model.time
+                    , registers = Selectable.select 0 model.registers
                 }
 
         Fail ->
@@ -505,7 +506,8 @@ viewPath items path currentTime grid =
                     [ drawStar grid ( location.x, location.y ) 15 [ Svg.Attributes.fill (rgbColor Color.black), Svg.Attributes.stroke (rgbColor Color.yellow) ]
                     ]
             else
-                Svg.g [ pulseOpacity currentTime ]
+                Svg.g
+                    [ pulseOpacity currentTime ]
                     [ Svg.circle
                         [ Svg.Attributes.cx <| toString (Grid.posX grid location.x)
                         , Svg.Attributes.cy <| toString (Grid.posY grid location.y)
@@ -804,31 +806,67 @@ viewRegisters mode selectableRegisters grid currentTime =
         Svg.g []
             (Selectable.indexedMapLocation
                 (\pos i register ->
-                    case pos of
-                        Selectable.Past ->
-                            Svg.g
-                                [ Grid.transform grid 2 (i + 1)
-                                ]
-                                (label i :: List.indexedMap viewInstruction register.instructions)
+                    let
+                        isSelected =
+                            case pos of
+                                Selectable.Current ->
+                                    True
 
-                        Selectable.Current ->
-                            Svg.g
-                                [ Grid.transform grid 2 (i + 1)
-                                ]
-                                (label i :: viewEnterToExecute mode register.instructions currentTime :: List.indexedMap viewInstruction register.instructions)
+                                _ ->
+                                    False
 
-                        Selectable.Upcoming ->
-                            Svg.g
-                                [ Grid.transform grid 2 (i + 1)
-                                ]
-                                (label i :: List.indexedMap viewInstruction register.instructions)
+                        isSelectedInstruction y =
+                            isSelected && isFirstNothing y register
+
+                        elements =
+                            List.indexedMap (\j inst -> viewInstruction (isSelectedInstruction j) j inst) register.instructions
+                                |> (\ls ->
+                                        if i == 0 then
+                                            viewHint mode register.instructions currentTime :: ls
+                                        else
+                                            ls
+                                   )
+                                |> (::) (label i)
+                                |> (\ls ->
+                                        if isSelected then
+                                            let
+                                                numInstructions =
+                                                    List.length register.instructions
+
+                                                selection =
+                                                    Svg.g [] []
+
+                                                --[ Svg.text_
+                                                --    [ Svg.Attributes.x <| toString <| (numInstructions * 55) - 40
+                                                --    , Svg.Attributes.y <| toString 47
+                                                --    , Svg.Attributes.fill (rgbColor Color.yellow)
+                                                --    , pulseOpacity currentTime
+                                                --    , Svg.Attributes.class "selection-bracket"
+                                                --    ]
+                                                --    [ Svg.text "]" ]
+                                                --, Svg.text_
+                                                --    [ Svg.Attributes.x <| toString -55
+                                                --    , Svg.Attributes.y <| toString 47
+                                                --    , Svg.Attributes.fill (rgbColor Color.yellow)
+                                                --    , pulseOpacity currentTime
+                                                --    , Svg.Attributes.class "selection-bracket"
+                                                --    ]
+                                                --    [ Svg.text "[" ]
+                                                --]
+                                            in
+                                                selection :: ls
+                                        else
+                                            ls
+                                   )
+                    in
+                        Svg.g [ Grid.transform grid 2 (i + 1) ] elements
                 )
                 selectableRegisters
             )
 
 
-viewEnterToExecute : Mode -> List (Maybe Instruction) -> Time -> Html Msg
-viewEnterToExecute mode insts time =
+viewHint : Mode -> List (Maybe Instruction) -> Time -> Html Msg
+viewHint mode insts time =
     let
         i =
             List.length insts
@@ -844,119 +882,101 @@ viewEnterToExecute mode insts time =
                     [ Svg.text "[ Executing... ]" ]
 
             Playing ->
-                if List.all (\x -> x /= Nothing) insts then
-                    Svg.text_
-                        [ Svg.Attributes.x <| toString (i * 55)
-                        , Svg.Attributes.y <| toString (35)
-                        , Svg.Attributes.fill (rgbColor Color.yellow)
-                        , pulseOpacity time
-                        ]
-                        [ Svg.text "[ Press Enter to Execute ]" ]
-                else
-                    Svg.g []
-                        [ Svg.text_
-                            [ Svg.Attributes.x <| toString <| (i * 55) - 40
-                            , Svg.Attributes.y <| toString 47
-                            , Svg.Attributes.fill (rgbColor Color.yellow)
-                            , pulseOpacity time
-                            , Svg.Attributes.class "selection-bracket"
-                            ]
-                            [ Svg.text "]" ]
-                        , Svg.text_
-                            [ Svg.Attributes.x <| toString -55
-                            , Svg.Attributes.y <| toString 47
-                            , Svg.Attributes.fill (rgbColor Color.yellow)
-                            , pulseOpacity time
-                            , Svg.Attributes.class "selection-bracket"
-                            ]
-                            [ Svg.text "[" ]
-                        ]
+                Svg.text_
+                    [ Svg.Attributes.x <| toString (i * 55)
+                    , Svg.Attributes.y <| toString (35)
+                    , Svg.Attributes.fill (rgbColor Color.yellow)
+                    , pulseOpacity time
+                    ]
+                    [ Svg.text "[ Press Enter to Execute ]" ]
 
             _ ->
                 Svg.text ""
 
 
-viewInstruction : Int -> Maybe Instruction -> Html Msg
-viewInstruction i mInstruction =
-    case mInstruction of
-        Nothing ->
-            Svg.circle
+viewInstruction : Bool -> Int -> Maybe Instruction -> Html Msg
+viewInstruction selected i mInstruction =
+    let
+        attributes =
+            if selected then
+                [ Svg.Attributes.cx <| toString (i * 55)
+                , Svg.Attributes.cy <| toString (30)
+                , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
+                , Svg.Attributes.stroke (rgbColor Color.yellow)
+                , Svg.Attributes.strokeWidth "3"
+                , Svg.Attributes.r "30"
+                , Svg.Attributes.strokeDasharray "4, 4"
+                ]
+            else
                 [ Svg.Attributes.cx <| toString (i * 55)
                 , Svg.Attributes.cy <| toString (30)
                 , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
                 , Svg.Attributes.stroke (rgbColor Color.black)
-                , Svg.Attributes.strokeWidth "5"
+                , Svg.Attributes.strokeWidth "3"
                 , Svg.Attributes.r "30"
                 ]
-                []
+    in
+        case mInstruction of
+            Nothing ->
+                Svg.circle
+                    attributes
+                    []
 
-        Just instruction ->
-            let
-                node deltaX deltaY =
-                    Svg.g []
-                        [ Svg.circle
-                            [ Svg.Attributes.cx <| toString (i * 55)
-                            , Svg.Attributes.cy <| toString (30)
-                            , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
-                            , Svg.Attributes.stroke (rgbColor Color.black)
-                            , Svg.Attributes.strokeWidth "5"
-                            , Svg.Attributes.r "30"
+            Just instruction ->
+                let
+                    node deltaX deltaY =
+                        Svg.g []
+                            [ Svg.circle
+                                attributes
+                                []
+                            , Svg.line
+                                [ Svg.Attributes.x1 <| toString <| (i * 55) + deltaX
+                                , Svg.Attributes.y1 <| toString (30 + deltaY)
+                                , Svg.Attributes.x2 <| toString (i * 55)
+                                , Svg.Attributes.y2 <| toString (30)
+                                , Svg.Attributes.stroke "#fff"
+                                , Svg.Attributes.strokeWidth "10"
+                                , Svg.Attributes.markerEnd "url(#arrow)"
+                                ]
+                                []
                             ]
-                            []
-                        , Svg.line
-                            [ Svg.Attributes.x1 <| toString <| (i * 55) + deltaX
-                            , Svg.Attributes.y1 <| toString (30 + deltaY)
-                            , Svg.Attributes.x2 <| toString (i * 55)
-                            , Svg.Attributes.y2 <| toString (30)
-                            , Svg.Attributes.stroke "#fff"
-                            , Svg.Attributes.strokeWidth "10"
-                            , Svg.Attributes.markerEnd "url(#arrow)"
+
+                    textNode txt =
+                        Svg.g []
+                            [ Svg.circle
+                                attributes
+                                []
+                            , Svg.text_
+                                [ Svg.Attributes.x <| toString <| (i * 55) - 8
+                                , Svg.Attributes.y <| toString <| (30) + 5
+                                , Svg.Attributes.width "55"
+                                , Svg.Attributes.height "30"
+                                , Svg.Attributes.fill "#fff"
+                                ]
+                                [ Svg.text txt ]
                             ]
-                            []
-                        ]
+                in
+                    case instruction of
+                        Move Left ->
+                            node 8 0
 
-                textNode txt =
-                    Svg.g []
-                        [ Svg.circle
-                            [ Svg.Attributes.cx <| toString (i * 55)
-                            , Svg.Attributes.cy <| toString (30)
-                            , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
-                            , Svg.Attributes.stroke (rgbColor Color.black)
-                            , Svg.Attributes.strokeWidth "5"
-                            , Svg.Attributes.r "30"
-                            ]
-                            []
-                        , Svg.text_
-                            [ Svg.Attributes.x <| toString <| (i * 55) - 8
-                            , Svg.Attributes.y <| toString <| (30) + 5
-                            , Svg.Attributes.width "55"
-                            , Svg.Attributes.height "30"
-                            , Svg.Attributes.fill "#fff"
-                            ]
-                            [ Svg.text txt ]
-                        ]
-            in
-                case instruction of
-                    Move Left ->
-                        node 8 0
+                        Move Right ->
+                            node (-8) 0
 
-                    Move Right ->
-                        node (-8) 0
+                        Move Up ->
+                            node 0 8
 
-                    Move Up ->
-                        node 0 8
+                        Move Down ->
+                            node 0 (-8)
 
-                    Move Down ->
-                        node 0 (-8)
+                        Call One ->
+                            textNode "F1"
 
-                    Call One ->
-                        textNode "F1"
+                        Call Two ->
+                            textNode "F2"
 
-                    Call Two ->
-                        textNode "F2"
-
-                    Call Three ->
-                        textNode "F3"
+                        Call Three ->
+                            textNode "F3"
 
 
 viewFunctionUI : List Instruction -> Html Msg

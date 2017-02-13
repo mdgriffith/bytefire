@@ -32,13 +32,23 @@ select i ({ past, current, upcoming } as x) =
             else
                 i
     in
-        { past = List.take (normalizedIndex) full
+        { past = List.take normalizedIndex full
         , current =
             List.drop normalizedIndex full
                 |> List.head
                 |> Maybe.withDefault current
         , upcoming = List.drop (normalizedIndex + 1) full
         }
+
+
+first : Selectable a -> a
+first { past, current } =
+    case past of
+        [] ->
+            current
+
+        fst :: _ ->
+            fst
 
 
 nextCycledIndex : Selectable a -> Int

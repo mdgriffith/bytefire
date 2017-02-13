@@ -142,6 +142,23 @@ replaceFirstNothing instruction fn =
         { fn | instructions = newInstructions }
 
 
+isFirstNothing : Int -> Function -> Bool
+isFirstNothing i fn =
+    let
+        isNothing x ( found, j ) =
+            if found then
+                ( found, j )
+            else if x == Nothing then
+                ( True, j )
+            else
+                ( False, j + 1 )
+
+        ( found, index ) =
+            List.foldl isNothing ( False, 0 ) fn.instructions
+    in
+        found && index == i
+
+
 overlapping : Coords -> List { a | x : Int, y : Int } -> Bool
 overlapping coord all =
     List.any (matching coord) all

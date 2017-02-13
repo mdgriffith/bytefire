@@ -963,7 +963,7 @@ viewControls mConditional count modelWidth modelHeight grid =
                     []
                 , Svg.rect
                     [ Svg.Attributes.x <| toString (-25)
-                    , Svg.Attributes.y <| toString 30
+                    , Svg.Attributes.y <| toString 33
                     , Svg.Attributes.width <| toString 50
                     , Svg.Attributes.height <| toString 50
                     , Svg.Attributes.fill (rgbColor Color.green)
@@ -987,7 +987,12 @@ viewInstructionControl mItemType grid i instruction =
             Just condition ->
                 onClick (AddInstruction (If condition instruction))
         ]
-        [ viewInstruction False 0 (Just instruction)
+        [ case mItemType of
+            Nothing ->
+                viewInstruction False 0 (Just instruction)
+
+            Just condition ->
+                viewInstruction False 0 (Just (If condition instruction))
         ]
 
 
@@ -1015,9 +1020,7 @@ viewInstruction selected i mInstruction =
     in
         case mInstruction of
             Nothing ->
-                Svg.circle
-                    attributes
-                    []
+                Svg.circle attributes []
 
             Just instruction ->
                 let

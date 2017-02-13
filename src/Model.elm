@@ -17,6 +17,7 @@ type alias Model =
     , stack : List StackLevel
     , width : Int
     , height : Int
+    , conditionalPrepared : Maybe ItemType
     }
 
 
@@ -314,6 +315,7 @@ initialModel =
     , height = 600
     , running = True
     , time = 0
+    , conditionalPrepared = Nothing
     , registers =
         selectable []
             [ { instructions =

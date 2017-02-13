@@ -85,6 +85,7 @@ type Msg
     | Reboot
     | AddInstruction Instruction
     | RemoveInstruction
+    | PrepareConditional ItemType
     | Select Int
     | Execute
     | ExecuteNextStep
@@ -172,7 +173,10 @@ update msg model =
                         | current = replaceFirstNothing instruction model.registers.current
                     }
             in
-                ( { model | registers = revisedRegisters }
+                ( { model
+                    | registers = revisedRegisters
+                    , conditionalPrepared = Nothing
+                  }
                 , Cmd.none
                 )
 
@@ -189,6 +193,17 @@ update msg model =
                 ( { model | registers = revisedRegisters }
                 , Cmd.none
                 )
+
+        PrepareConditional item ->
+            ( { model
+                | conditionalPrepared =
+                    if Just item == model.conditionalPrepared then
+                        Nothing
+                    else
+                        Just item
+              }
+            , Cmd.none
+            )
 
         Select index ->
             ( { model
@@ -473,7 +488,7 @@ view model =
         [ node "style" [] [ text stylesheet ]
         , Html.Lazy.lazy3 viewGrid model.width model.height model.grid
         , viewLevel model
-        , viewControls (Selectable.length model.registers) model.width model.height model.grid
+        , viewControls model.conditionalPrepared (Selectable.length model.registers) model.width model.height model.grid
         , case model.mode of
             Paused ->
                 div [ class "overlay" ]
@@ -824,7 +839,7 @@ viewRegisters mode selectableRegisters grid currentTime =
                 [ Svg.Attributes.fill "white"
                 , Svg.Attributes.class "fn-label"
                 , Svg.Attributes.x <| toString -75
-                , Svg.Attributes.y <| toString 35
+                , Svg.Attributes.y <| toString 5
                 ]
                 [ Svg.text <| "F" ++ toString (i + 1) ]
     in
@@ -919,24 +934,58 @@ viewHint mode insts time =
                 Svg.text ""
 
 
-viewControls : Int -> Int -> Int -> Grid -> Html Msg
-viewControls count modelWidth modelHeight grid =
-    Svg.svg
-        [ Svg.Attributes.class "svg-base"
-        , width modelWidth
-        , height modelHeight
-        ]
-        [ Svg.g [] (List.indexedMap (viewInstructionControl grid) (callInstructions count))
-          --, div [] (List.map viewIfUi [Square, Circle])
-        ]
+viewControls : Maybe ItemType -> Int -> Int -> Int -> Grid -> Html Msg
+viewControls mConditional count modelWidth modelHeight grid =
+    let
+        instructions =
+            callInstructions count
+
+        instructionCount =
+            List.length instructions
+    in
+        Svg.svg
+            [ Svg.Attributes.class "svg-base"
+            , width modelWidth
+            , height modelHeight
+            ]
+            [ Svg.g [] (List.indexedMap (viewInstructionControl mConditional grid) instructions)
+            , Svg.g [ Grid.transformFrom grid Grid.topRight 1 instructionCount ]
+                [ Svg.circle
+                    [ Svg.Attributes.cx <| toString (0 * 55)
+                    , Svg.Attributes.cy <| toString (0)
+                    , Svg.Attributes.fill (rgbColor Color.blue)
+                    , Svg.Attributes.stroke (rgbColor Color.black)
+                    , Svg.Attributes.strokeWidth "3"
+                    , Svg.Attributes.r "30"
+                    , Svg.Attributes.class "instruction-control"
+                    , onClick (PrepareConditional Circle)
+                    ]
+                    []
+                , Svg.rect
+                    [ Svg.Attributes.x <| toString (-25)
+                    , Svg.Attributes.y <| toString 30
+                    , Svg.Attributes.width <| toString 50
+                    , Svg.Attributes.height <| toString 50
+                    , Svg.Attributes.fill (rgbColor Color.green)
+                    , Svg.Attributes.class "instruction-control"
+                    , onClick (PrepareConditional Square)
+                    ]
+                    []
+                ]
+            ]
 
 
-viewInstructionControl : Grid -> Int -> Instruction -> Html Msg
-viewInstructionControl grid i instruction =
+viewInstructionControl : Maybe ItemType -> Grid -> Int -> Instruction -> Html Msg
+viewInstructionControl mItemType grid i instruction =
     Svg.g
         [ Grid.transformFrom grid Grid.topRight 1 (i + 1)
         , Svg.Attributes.class "instruction-control"
-        , onClick (AddInstruction instruction)
+        , case mItemType of
+            Nothing ->
+                onClick (AddInstruction instruction)
+
+            Just condition ->
+                onClick (AddInstruction (If condition instruction))
         ]
         [ viewInstruction False 0 (Just instruction)
         ]
@@ -947,8 +996,8 @@ viewInstruction selected i mInstruction =
     let
         attributes =
             if selected then
-                [ Svg.Attributes.cx <| toString (i * 55)
-                , Svg.Attributes.cy <| toString (30)
+                [ Svg.Attributes.cx <| toString (i * 60)
+                , Svg.Attributes.cy <| toString (0)
                 , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
                 , Svg.Attributes.stroke (rgbColor Color.yellow)
                 , Svg.Attributes.strokeWidth "3"
@@ -956,8 +1005,8 @@ viewInstruction selected i mInstruction =
                 , Svg.Attributes.strokeDasharray "4, 4"
                 ]
             else
-                [ Svg.Attributes.cx <| toString (i * 55)
-                , Svg.Attributes.cy <| toString (30)
+                [ Svg.Attributes.cx <| toString (i * 60)
+                , Svg.Attributes.cy <| toString (0)
                 , Svg.Attributes.fill (rgbColor Color.darkCharcoal)
                 , Svg.Attributes.stroke (rgbColor Color.black)
                 , Svg.Attributes.strokeWidth "3"
@@ -989,10 +1038,10 @@ viewInstruction selected i mInstruction =
                                         ( 0, -8 )
                         in
                             Svg.line
-                                [ Svg.Attributes.x1 <| toString <| (i * 55) + deltaX
-                                , Svg.Attributes.y1 <| toString (30 + deltaY)
-                                , Svg.Attributes.x2 <| toString (i * 55)
-                                , Svg.Attributes.y2 <| toString (30)
+                                [ Svg.Attributes.x1 <| toString <| (i * 60) + deltaX
+                                , Svg.Attributes.y1 <| toString (0 + deltaY)
+                                , Svg.Attributes.x2 <| toString (i * 60)
+                                , Svg.Attributes.y2 <| toString (0)
                                 , Svg.Attributes.stroke "#fff"
                                 , Svg.Attributes.strokeWidth "10"
                                 , Svg.Attributes.markerEnd "url(#arrow)"
@@ -1010,9 +1059,9 @@ viewInstruction selected i mInstruction =
 
                     textNode txt =
                         Svg.text_
-                            [ Svg.Attributes.x <| toString <| (i * 55) - 8
-                            , Svg.Attributes.y <| toString <| (30) + 5
-                            , Svg.Attributes.width "55"
+                            [ Svg.Attributes.x <| toString <| (i * 60) - 8
+                            , Svg.Attributes.y <| toString <| 5
+                            , Svg.Attributes.width "60"
                             , Svg.Attributes.height "30"
                             , Svg.Attributes.fill "#fff"
                             ]

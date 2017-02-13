@@ -96,24 +96,27 @@ type Msg
         }
 
 
-keyboard :
-    { a : number1
-    , backspace : number2
-    , d : number3
-    , down : number4
-    , enter : number5
+type alias Keys =
+    { a : Int
+    , backspace : Int
+    , d : Int
+    , down : Int
+    , enter : Int
     , esc : Int
-    , left : number6
-    , one : number7
-    , right : number8
-    , s : number9
-    , tab : number10
-    , three : number11
-    , two : number12
-    , up : number13
-    , w : number14
-    , space : number
+    , left : Int
+    , one : Int
+    , right : Int
+    , s : Int
+    , tab : Int
+    , three : Int
+    , two : Int
+    , up : Int
+    , w : Int
+    , space : Int
     }
+
+
+keyboard : Keys
 keyboard =
     { left = 37
     , right = 39
@@ -187,7 +190,9 @@ update msg model =
                 )
 
         Select index ->
-            ( { model | registers = Selectable.select index model.registers }
+            ( { model
+                | registers = Selectable.select index model.registers
+              }
             , Cmd.none
             )
 
@@ -249,65 +254,7 @@ update msg model =
                                                 |> andThen ExecuteNextStep
 
                             Just instruction ->
-                                case instruction of
-                                    Move direction ->
-                                        let
-                                            newPath =
-                                                move direction model.path
-                                        in
-                                            if winning newPath model.items then
-                                                ( { model
-                                                    | path = newPath
-                                                    , mode = Success
-                                                  }
-                                                , Cmd.none
-                                                )
-                                            else if losing model.map newPath then
-                                                ( { model
-                                                    | path = newPath
-                                                    , mode = Failed model.time OutOfBounds
-                                                  }
-                                                , Cmd.none
-                                                )
-                                            else
-                                                ( { model
-                                                    | path = newPath
-                                                    , mode = Executing (i + 1) model.time
-                                                  }
-                                                , Cmd.none
-                                                )
-
-                                    Call fn ->
-                                        let
-                                            fnIndex =
-                                                case fn of
-                                                    One ->
-                                                        0
-
-                                                    Two ->
-                                                        1
-
-                                                    Three ->
-                                                        2
-
-                                            currentRegister =
-                                                Selectable.currentIndex model.registers
-                                        in
-                                            if List.length model.stack > 5 then
-                                                ( { model
-                                                    | mode = Failed model.time StackOverflow
-                                                  }
-                                                , Cmd.none
-                                                )
-                                            else
-                                                ( { model
-                                                    | mode = Executing 0 model.time
-                                                    , stack = StackLevel currentRegister (i + 1) :: model.stack
-                                                    , registers =
-                                                        Selectable.select fnIndex model.registers
-                                                  }
-                                                , Cmd.none
-                                                )
+                                resolveInstruction i instruction model
 
                 _ ->
                     ( { model
@@ -388,6 +335,79 @@ update msg model =
                         height
             in
                 ( resizeGrid minWidth minHeight model
+                , Cmd.none
+                )
+
+
+resolveInstruction : Int -> Instruction -> Model -> ( Model, Cmd Msg )
+resolveInstruction i instruction model =
+    case instruction of
+        Move direction ->
+            let
+                newPath =
+                    move direction model.path
+            in
+                if winning newPath model.items then
+                    ( { model
+                        | path = newPath
+                        , mode = Success
+                      }
+                    , Cmd.none
+                    )
+                else if losing model.map newPath then
+                    ( { model
+                        | path = newPath
+                        , mode = Failed model.time OutOfBounds
+                      }
+                    , Cmd.none
+                    )
+                else
+                    ( { model
+                        | path = newPath
+                        , mode = Executing (i + 1) model.time
+                      }
+                    , Cmd.none
+                    )
+
+        Call fn ->
+            let
+                fnIndex =
+                    case fn of
+                        One ->
+                            0
+
+                        Two ->
+                            1
+
+                        Three ->
+                            2
+
+                currentRegister =
+                    Selectable.currentIndex model.registers
+            in
+                if List.length model.stack > 5 then
+                    ( { model
+                        | mode = Failed model.time StackOverflow
+                      }
+                    , Cmd.none
+                    )
+                else
+                    ( { model
+                        | mode = Executing 0 model.time
+                        , stack = StackLevel currentRegister (i + 1) :: model.stack
+                        , registers =
+                            Selectable.select fnIndex model.registers
+                      }
+                    , Cmd.none
+                    )
+
+        If shape newInstruction ->
+            if occupiedItem model == Just shape then
+                resolveInstruction i newInstruction model
+            else
+                ( { model
+                    | mode = Executing (i + 1) model.time
+                  }
                 , Cmd.none
                 )
 
@@ -924,12 +944,23 @@ viewInstruction selected i mInstruction =
 
             Just instruction ->
                 let
-                    node deltaX deltaY =
-                        Svg.g []
-                            [ Svg.circle
-                                attributes
-                                []
-                            , Svg.line
+                    arrow direction =
+                        let
+                            ( deltaX, deltaY ) =
+                                case direction of
+                                    Left ->
+                                        ( 8, 0 )
+
+                                    Right ->
+                                        ( -8, 0 )
+
+                                    Up ->
+                                        ( 0, 8 )
+
+                                    Down ->
+                                        ( 0, -8 )
+                        in
+                            Svg.line
                                 [ Svg.Attributes.x1 <| toString <| (i * 55) + deltaX
                                 , Svg.Attributes.y1 <| toString (30 + deltaY)
                                 , Svg.Attributes.x2 <| toString (i * 55)
@@ -939,44 +970,66 @@ viewInstruction selected i mInstruction =
                                 , Svg.Attributes.markerEnd "url(#arrow)"
                                 ]
                                 []
-                            ]
+
+                    circle color children =
+                        Svg.g []
+                            ((Svg.circle
+                                (attributes ++ [ Svg.Attributes.fill (rgbColor color) ])
+                                []
+                             )
+                                :: children
+                            )
 
                     textNode txt =
-                        Svg.g []
-                            [ Svg.circle
-                                attributes
-                                []
-                            , Svg.text_
-                                [ Svg.Attributes.x <| toString <| (i * 55) - 8
-                                , Svg.Attributes.y <| toString <| (30) + 5
-                                , Svg.Attributes.width "55"
-                                , Svg.Attributes.height "30"
-                                , Svg.Attributes.fill "#fff"
-                                ]
-                                [ Svg.text txt ]
+                        Svg.text_
+                            [ Svg.Attributes.x <| toString <| (i * 55) - 8
+                            , Svg.Attributes.y <| toString <| (30) + 5
+                            , Svg.Attributes.width "55"
+                            , Svg.Attributes.height "30"
+                            , Svg.Attributes.fill "#fff"
                             ]
+                            [ Svg.text txt ]
+
+                    symbol inst =
+                        case inst of
+                            Move direction ->
+                                [ arrow direction ]
+
+                            Call One ->
+                                [ textNode "F1" ]
+
+                            Call Two ->
+                                [ textNode "F2" ]
+
+                            Call Three ->
+                                [ textNode "F3" ]
+
+                            _ ->
+                                []
                 in
                     case instruction of
-                        Move Left ->
-                            node 8 0
-
-                        Move Right ->
-                            node (-8) 0
-
-                        Move Up ->
-                            node 0 8
-
-                        Move Down ->
-                            node 0 (-8)
+                        Move direction ->
+                            circle Color.darkCharcoal (symbol instruction)
 
                         Call One ->
-                            textNode "F1"
+                            circle Color.darkCharcoal (symbol instruction)
 
                         Call Two ->
-                            textNode "F2"
+                            circle Color.darkCharcoal (symbol instruction)
 
                         Call Three ->
-                            textNode "F3"
+                            circle Color.darkCharcoal (symbol instruction)
+
+                        If shape instruction ->
+                            case shape of
+                                Node ->
+                                    circle Color.yellow (symbol instruction)
+
+                                Square ->
+                                    circle Color.green (symbol instruction)
+
+                                Circle ->
+                                    circle Color.blue (symbol instruction)
 
 
 viewFunctionUI : List Instruction -> Html Msg

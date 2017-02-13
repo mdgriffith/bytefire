@@ -77,6 +77,7 @@ type Direction
 type Instruction
     = Move Direction
     | Call FnIndex
+    | If ItemType Instruction
 
 
 type FnIndex
@@ -177,6 +178,21 @@ overlappingSegment (Seg p1 p2) all =
                 || (matching p1 point2 && matching p2 point1)
         )
         all
+
+
+occupiedItem : Model -> Maybe ItemType
+occupiedItem model =
+    let
+        rendered =
+            renderPath model.path
+    in
+        model.items
+            |> List.filter
+                (\item ->
+                    overlapping { x = item.x, y = item.y } rendered
+                )
+            |> List.head
+            |> Maybe.map .kind
 
 
 renderPath : Path -> List Coords
@@ -293,31 +309,6 @@ resizeGrid width height model =
         , width = width
         , height = height
     }
-
-
-
---levels = selectable [] [] levelOne
---levelOne : Level
---levelOne =
---    { map = selectable [] [] startingLocation
---    , registers =
---        selectable []
---            []
---            { instructions =
---                [ Just <| Move Left
---                , Just <| Move Up
---                , Just <| Move Right
---                , Just <| Move Up
---                , Nothing
---                ]
---            }
---    }
---startingLocation : Location
---startingLocation =
---{ x = 20
---, y = 10
---, star = False
---}
 
 
 selectable : List a -> List a -> a -> Selectable a

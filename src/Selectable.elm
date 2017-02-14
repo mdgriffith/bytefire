@@ -14,6 +14,12 @@ type Loc
     | Upcoming
 
 
+
+--fromList : List a -> a -> Maybe (Selectable a)
+--fromList list =
+--    case list of
+
+
 length : Selectable a -> Int
 length { past, current, upcoming } =
     List.length past + 1 + List.length upcoming
@@ -71,6 +77,14 @@ nextCycledIndex { past, current, upcoming } =
 currentIndex : Selectable a -> Int
 currentIndex { past } =
     List.length past
+
+
+mapCurrent : (a -> a) -> Selectable a -> Selectable a
+mapCurrent fn selectable =
+    { past = selectable.past
+    , current = fn selectable.current
+    , upcoming = selectable.upcoming
+    }
 
 
 map : (a -> b) -> Selectable a -> Selectable b

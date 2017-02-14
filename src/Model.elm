@@ -6,17 +6,22 @@ import Time exposing (Time)
 
 
 type alias Model =
-    { path : Path
-    , map : Map
-    , items : List Item
-    , registers : Selectable Function
-    , grid : Grid
+    { grid : Grid
     , running : Bool
     , time : Time
     , mode : Mode
-    , stack : List StackLevel
     , width : Int
     , height : Int
+    , levels : Selectable Level
+    }
+
+
+type alias Level =
+    { path : Path
+    , map : Map
+    , items : List Item
+    , functions : Selectable Function
+    , stack : List StackLevel
     , conditionalPrepared : Maybe ItemType
     }
 
@@ -133,8 +138,8 @@ readyToExecute fn =
     List.all (\x -> x /= Nothing) fn.instructions
 
 
-resetRegisters : Function -> Function
-resetRegisters fn =
+resetFunctions : Function -> Function
+resetFunctions fn =
     { fn | instructions = List.repeat (List.length fn.instructions) Nothing }
 
 
@@ -215,13 +220,13 @@ overlappingSegment (Seg p1 p2) all =
         all
 
 
-occupiedItem : Model -> Maybe ItemType
-occupiedItem model =
+occupiedItem : Level -> Maybe ItemType
+occupiedItem level =
     let
         rendered =
-            renderPath model.path
+            renderPath level.path
     in
-        model.items
+        level.items
             |> List.filter
                 (\item ->
                     overlapping { x = item.x, y = item.y } rendered
@@ -277,63 +282,67 @@ resetPath (Path start _) =
 
 initialModel : Model
 initialModel =
-    { mode = Playing
-    , path = Path { x = 5, y = 5 } []
-    , map =
-        Map
-            [ Seg { x = 5, y = 5 } { x = 6, y = 5 }
-            , Seg { x = 6, y = 5 } { x = 6, y = 6 }
-            , Seg { x = 6, y = 6 } { x = 7, y = 6 }
-            , Seg { x = 7, y = 6 } { x = 7, y = 7 }
-            , Seg { x = 7, y = 7 } { x = 8, y = 7 }
-            , Seg { x = 8, y = 7 } { x = 9, y = 7 }
-            , Seg { x = 9, y = 7 } { x = 10, y = 7 }
-            , Seg { x = 10, y = 7 } { x = 11, y = 7 }
-            , Seg { x = 11, y = 7 } { x = 12, y = 7 }
-            ]
-    , stack = []
-    , items =
-        [ { x = 6
-          , y = 5
-          , kind = Node
-          }
-        , { x = 6
-          , y = 6
-          , kind = Square
-          }
-        , { x = 8
-          , y = 7
-          , kind = Circle
-          }
-        , { x = 12
-          , y = 7
-          , kind = Node
-          }
-        ]
-    , grid = Grid.init 60 60 1000 600
+    { grid = Grid.init 60 60 1000 600
     , width = 1000
     , height = 600
     , running = True
     , time = 0
-    , conditionalPrepared = Nothing
-    , registers =
+    , mode = Playing
+    , levels =
         selectable []
-            [ { instructions =
-                    [ Nothing
-                    , Nothing
-                    , Nothing
-                    , Nothing
-                    , Nothing
+            []
+            { path = Path { x = 5, y = 5 } []
+            , map =
+                Map
+                    [ Seg { x = 5, y = 5 } { x = 6, y = 5 }
+                    , Seg { x = 6, y = 5 } { x = 6, y = 6 }
+                    , Seg { x = 6, y = 6 } { x = 7, y = 6 }
+                    , Seg { x = 7, y = 6 } { x = 7, y = 7 }
+                    , Seg { x = 7, y = 7 } { x = 8, y = 7 }
+                    , Seg { x = 8, y = 7 } { x = 9, y = 7 }
+                    , Seg { x = 9, y = 7 } { x = 10, y = 7 }
+                    , Seg { x = 10, y = 7 } { x = 11, y = 7 }
+                    , Seg { x = 11, y = 7 } { x = 12, y = 7 }
                     ]
-              }
-            ]
-            { instructions =
-                [ Nothing
-                , Nothing
-                , Nothing
-                , Nothing
-                , Nothing
+            , stack = []
+            , items =
+                [ { x = 6
+                  , y = 5
+                  , kind = Node
+                  }
+                , { x = 6
+                  , y = 6
+                  , kind = Square
+                  }
+                , { x = 8
+                  , y = 7
+                  , kind = Circle
+                  }
+                , { x = 12
+                  , y = 7
+                  , kind = Node
+                  }
                 ]
+            , conditionalPrepared = Nothing
+            , functions =
+                selectable []
+                    [ { instructions =
+                            [ Nothing
+                            , Nothing
+                            , Nothing
+                            , Nothing
+                            , Nothing
+                            ]
+                      }
+                    ]
+                    { instructions =
+                        [ Nothing
+                        , Nothing
+                        , Nothing
+                        , Nothing
+                        , Nothing
+                        ]
+                    }
             }
     }
 

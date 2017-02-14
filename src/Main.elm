@@ -68,7 +68,7 @@ main =
                                     else if code == keyboard.three then
                                         AddInstruction <| Call Three
                                     else if code == keyboard.space then
-                                        Select (Selectable.nextCycledIndex model.registers)
+                                        Select (Selectable.nextCycledIndex model.levels.current.functions)
                                     else
                                         NoOp
 
@@ -148,6 +148,14 @@ andThen msg ( model, cmd ) =
         ( updated, Cmd.batch [ cmd, newCmd ] )
 
 
+onCurrentLevel : Model -> (Level -> Level) -> Model
+onCurrentLevel model fn =
+    { model
+        | levels =
+            Selectable.mapCurrent fn model.levels
+    }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -155,60 +163,57 @@ update msg model =
             ( model, Cmd.none )
 
         Reboot ->
-            ( { model
-                | registers = Selectable.map resetRegisters model.registers
-                , path = resetPath model.path
-                , mode = Playing
-              }
+            ( onCurrentLevel { model | mode = Playing }
+                (\level ->
+                    { level
+                        | functions = Selectable.map resetFunctions level.functions
+                        , path = resetPath level.path
+                    }
+                )
             , Cmd.none
             )
 
         AddInstruction instruction ->
-            let
-                oldRegisters =
-                    model.registers
-
-                revisedRegisters =
-                    { oldRegisters
-                        | current = replaceFirstNothing instruction model.registers.current
+            ( onCurrentLevel model
+                (\level ->
+                    { level
+                        | conditionalPrepared = Nothing
+                        , functions = Selectable.mapCurrent (replaceFirstNothing instruction) level.functions
                     }
-            in
-                ( { model
-                    | registers = revisedRegisters
-                    , conditionalPrepared = Nothing
-                  }
-                , Cmd.none
                 )
+            , Cmd.none
+            )
 
         RemoveInstruction ->
-            let
-                oldRegisters =
-                    model.registers
-
-                revisedRegisters =
-                    { oldRegisters
-                        | current = removeLatest model.registers.current
+            ( onCurrentLevel model
+                (\level ->
+                    { level
+                        | functions =
+                            Selectable.mapCurrent removeLatest level.functions
                     }
-            in
-                ( { model | registers = revisedRegisters }
-                , Cmd.none
                 )
+            , Cmd.none
+            )
 
         PrepareConditional item ->
-            ( { model
-                | conditionalPrepared =
-                    if Just item == model.conditionalPrepared then
-                        Nothing
-                    else
-                        Just item
-              }
+            ( onCurrentLevel model
+                (\level ->
+                    { level
+                        | conditionalPrepared =
+                            if Just item == level.conditionalPrepared then
+                                Nothing
+                            else
+                                Just item
+                    }
+                )
             , Cmd.none
             )
 
         Select index ->
-            ( { model
-                | registers = Selectable.select index model.registers
-              }
+            ( onCurrentLevel model
+                (\level ->
+                    { level | functions = Selectable.select index level.functions }
+                )
             , Cmd.none
             )
 
@@ -216,7 +221,12 @@ update msg model =
             update ExecuteNextStep
                 { model
                     | mode = Executing 0 model.time
-                    , registers = Selectable.select 0 model.registers
+                    , levels =
+                        Selectable.mapCurrent
+                            (\level ->
+                                { level | functions = Selectable.select 0 level.functions }
+                            )
+                            model.levels
                 }
 
         Fail ->
@@ -227,7 +237,7 @@ update msg model =
                 Executing i _ ->
                     let
                         maybeInstruction =
-                            List.drop i model.registers.current.instructions
+                            List.drop i model.levels.current.functions.current.instructions
                                 |> List.head
                                 |> (\x ->
                                         case x of
@@ -240,20 +250,20 @@ update msg model =
                     in
                         case maybeInstruction of
                             Nothing ->
-                                if winning model.path model.items then
+                                if winning model.levels.current.path model.levels.current.items then
                                     ( { model
                                         | mode = Success
                                       }
                                     , Cmd.none
                                     )
-                                else if losing model.map model.path then
+                                else if losing model.levels.current.map model.levels.current.path then
                                     ( { model
                                         | mode = Failed model.time OutOfBounds
                                       }
                                     , Cmd.none
                                     )
                                 else
-                                    case model.stack of
+                                    case model.levels.current.stack of
                                         [] ->
                                             ( { model
                                                 | mode = Failed model.time NoInstructions
@@ -264,13 +274,22 @@ update msg model =
                                         (StackLevel fnIndex step) :: remain ->
                                             { model
                                                 | mode = Executing step model.time
-                                                , stack = remain
+                                                , levels = Selectable.mapCurrent (\level -> { level | stack = remain }) model.levels
                                             }
                                                 |> update (Select fnIndex)
                                                 |> andThen ExecuteNextStep
 
                             Just instruction ->
-                                resolveInstruction i instruction model
+                                let
+                                    ( newLevel, mode ) =
+                                        resolveInstruction model.time i instruction model.levels.current
+                                in
+                                    ( { model
+                                        | mode = mode
+                                        , levels = Selectable.mapCurrent (\_ -> newLevel) model.levels
+                                      }
+                                    , Cmd.none
+                                    )
 
                 _ ->
                     ( { model
@@ -355,34 +374,31 @@ update msg model =
                 )
 
 
-resolveInstruction : Int -> Instruction -> Model -> ( Model, Cmd Msg )
-resolveInstruction i instruction model =
+resolveInstruction : Time -> Int -> Instruction -> Level -> ( Level, Mode )
+resolveInstruction time i instruction level =
     case instruction of
         Move direction ->
             let
                 newPath =
-                    move direction model.path
+                    move direction level.path
             in
-                if winning newPath model.items then
-                    ( { model
+                if winning newPath level.items then
+                    ( { level
                         | path = newPath
-                        , mode = Success
                       }
-                    , Cmd.none
+                    , Success
                     )
-                else if losing model.map newPath then
-                    ( { model
+                else if losing level.map newPath then
+                    ( { level
                         | path = newPath
-                        , mode = Failed model.time OutOfBounds
                       }
-                    , Cmd.none
+                    , Failed time OutOfBounds
                     )
                 else
-                    ( { model
+                    ( { level
                         | path = newPath
-                        , mode = Executing (i + 1) model.time
                       }
-                    , Cmd.none
+                    , Executing (i + 1) time
                     )
 
         Call fn ->
@@ -399,32 +415,27 @@ resolveInstruction i instruction model =
                             2
 
                 currentRegister =
-                    Selectable.currentIndex model.registers
+                    Selectable.currentIndex level.functions
             in
-                if List.length model.stack > 5 then
-                    ( { model
-                        | mode = Failed model.time StackOverflow
-                      }
-                    , Cmd.none
+                if List.length level.stack > 5 then
+                    ( level
+                    , Failed time StackOverflow
                     )
                 else
-                    ( { model
-                        | mode = Executing 0 model.time
-                        , stack = StackLevel currentRegister (i + 1) :: model.stack
-                        , registers =
-                            Selectable.select fnIndex model.registers
+                    ( { level
+                        | stack = StackLevel currentRegister (i + 1) :: level.stack
+                        , functions =
+                            Selectable.select fnIndex level.functions
                       }
-                    , Cmd.none
+                    , Executing 0 time
                     )
 
         If shape newInstruction ->
-            if occupiedItem model == Just shape then
-                resolveInstruction i newInstruction model
+            if occupiedItem level == Just shape then
+                resolveInstruction time i newInstruction level
             else
-                ( { model
-                    | mode = Executing (i + 1) model.time
-                  }
-                , Cmd.none
+                ( level
+                , Executing (i + 1) time
                 )
 
 
@@ -487,8 +498,7 @@ view model =
     div [ width model.width, height model.height ]
         [ node "style" [] [ text stylesheet ]
         , Html.Lazy.lazy3 viewGrid model.width model.height model.grid
-        , viewLevel model
-        , viewControls model.conditionalPrepared (Selectable.length model.registers) model.width model.height model.grid
+        , viewLevel model model.levels.current
         , case model.mode of
             Paused ->
                 div [ class "overlay" ]
@@ -534,8 +544,8 @@ viewGrid modelWidth modelHeight grid =
         ]
 
 
-viewPath : List Item -> Path -> Time -> Grid -> Html Msg
-viewPath items path currentTime grid =
+viewPath : Grid -> Time -> List Item -> Path -> Html Msg
+viewPath grid currentTime items path =
     let
         nodes =
             List.filter (\i -> i.kind == Node) items
@@ -602,8 +612,8 @@ viewPath items path currentTime grid =
             (track :: points)
 
 
-viewMap : Map -> Grid -> Html Msg
-viewMap (Map segments) grid =
+viewMap : Grid -> Map -> Html Msg
+viewMap grid (Map segments) =
     let
         renderedSegments =
             List.map viewSegment segments
@@ -625,8 +635,8 @@ viewMap (Map segments) grid =
             (List.map viewSegment segments)
 
 
-viewLevel : Model -> Html Msg
-viewLevel ({ path, time, grid, registers, items, mode } as model) =
+viewLevel : Model -> Level -> Html Msg
+viewLevel model { path, functions, items, conditionalPrepared, map } =
     let
         renderedPath =
             renderPath path
@@ -667,11 +677,43 @@ viewLevel ({ path, time, grid, registers, items, mode } as model) =
                     [ Svg.path [ Svg.Attributes.d "M0,0 L0,2 L1.5,1 z", Svg.Attributes.fill "#fff" ] []
                     ]
                 ]
-            , viewMap model.map grid
-            , viewPath items path time grid
-            , Svg.g [] (List.map (viewItem grid renderedPath time) items)
-            , viewRegisters mode registers grid time
-              --, viewFunctionUI allInstructions
+            , viewMap model.grid map
+            , viewPath model.grid model.time items path
+            , Svg.g [] (List.map (viewItem model.grid renderedPath model.time) items)
+            , viewFunctions model.mode functions model.grid model.time
+            , let
+                instructions =
+                    callInstructions (Selectable.length functions)
+
+                instructionCount =
+                    List.length instructions
+              in
+                Svg.g []
+                    [ Svg.g [] (List.indexedMap (viewInstructionControl conditionalPrepared model.grid) instructions)
+                    , Svg.g [ Grid.transformFrom model.grid Grid.topRight 1 (instructionCount + 1) ]
+                        [ Svg.circle
+                            [ Svg.Attributes.cx <| toString (0 * 55)
+                            , Svg.Attributes.cy <| toString (0)
+                            , Svg.Attributes.fill (rgbColor Color.blue)
+                            , Svg.Attributes.stroke (rgbColor Color.black)
+                            , Svg.Attributes.strokeWidth "3"
+                            , Svg.Attributes.r "30"
+                            , Svg.Attributes.class "instruction-control"
+                            , onClick (PrepareConditional Circle)
+                            ]
+                            []
+                        , Svg.rect
+                            [ Svg.Attributes.x <| toString (-25)
+                            , Svg.Attributes.y <| toString 33
+                            , Svg.Attributes.width <| toString 50
+                            , Svg.Attributes.height <| toString 50
+                            , Svg.Attributes.fill (rgbColor Color.green)
+                            , Svg.Attributes.class "instruction-control"
+                            , onClick (PrepareConditional Square)
+                            ]
+                            []
+                        ]
+                    ]
             ]
 
 
@@ -831,8 +873,8 @@ viewItem grid renderedPath currentTime item =
                     ]
 
 
-viewRegisters : Mode -> Selectable Function -> Grid -> Time -> Html Msg
-viewRegisters mode selectableRegisters grid currentTime =
+viewFunctions : Mode -> Selectable Function -> Grid -> Time -> Html Msg
+viewFunctions mode selectableFunctions grid currentTime =
     let
         label i =
             Svg.text_
@@ -901,7 +943,7 @@ viewRegisters mode selectableRegisters grid currentTime =
                     in
                         Svg.g [ Grid.transform grid 2 (i + 1) ] elements
                 )
-                selectableRegisters
+                selectableFunctions
             )
 
 
@@ -932,47 +974,6 @@ viewHint mode insts time =
 
             _ ->
                 Svg.text ""
-
-
-viewControls : Maybe ItemType -> Int -> Int -> Int -> Grid -> Html Msg
-viewControls mConditional count modelWidth modelHeight grid =
-    let
-        instructions =
-            callInstructions count
-
-        instructionCount =
-            List.length instructions
-    in
-        Svg.svg
-            [ Svg.Attributes.class "svg-base"
-            , width modelWidth
-            , height modelHeight
-            ]
-            [ Svg.g [] (List.indexedMap (viewInstructionControl mConditional grid) instructions)
-            , Svg.g [ Grid.transformFrom grid Grid.topRight 1 instructionCount ]
-                [ Svg.circle
-                    [ Svg.Attributes.cx <| toString (0 * 55)
-                    , Svg.Attributes.cy <| toString (0)
-                    , Svg.Attributes.fill (rgbColor Color.blue)
-                    , Svg.Attributes.stroke (rgbColor Color.black)
-                    , Svg.Attributes.strokeWidth "3"
-                    , Svg.Attributes.r "30"
-                    , Svg.Attributes.class "instruction-control"
-                    , onClick (PrepareConditional Circle)
-                    ]
-                    []
-                , Svg.rect
-                    [ Svg.Attributes.x <| toString (-25)
-                    , Svg.Attributes.y <| toString 33
-                    , Svg.Attributes.width <| toString 50
-                    , Svg.Attributes.height <| toString 50
-                    , Svg.Attributes.fill (rgbColor Color.green)
-                    , Svg.Attributes.class "instruction-control"
-                    , onClick (PrepareConditional Square)
-                    ]
-                    []
-                ]
-            ]
 
 
 viewInstructionControl : Maybe ItemType -> Grid -> Int -> Instruction -> Html Msg

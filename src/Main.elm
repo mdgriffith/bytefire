@@ -19,6 +19,22 @@ import Model exposing (..)
 import Selectable exposing (Selectable)
 import Grid exposing (Grid, rgbColor)
 import List.Extra
+import Levels
+
+
+initialModel : Model
+initialModel =
+    { grid = Grid.init 60 60 1000 600
+    , width = 1000
+    , height = 600
+    , running = True
+    , time = 0
+    , mode = Playing
+    , levels =
+        selectable []
+            []
+            Levels.greenTest
+    }
 
 
 main : Program Never Model Msg
@@ -374,9 +390,36 @@ update msg model =
                 )
 
 
+winning : Path -> List Item -> Bool
+winning path items =
+    let
+        nodes =
+            List.filter (\item -> item.kind == Node) items
+
+        rendered =
+            renderPath path
+    in
+        List.all (\node -> overlapping { x = node.x, y = node.y } rendered) nodes
+
+
+losing : Map -> Path -> Bool
+losing (Map segments) path =
+    let
+        rendered =
+            renderPath path
+
+        pathSegments =
+            List.map2 (Seg) rendered (List.drop 1 rendered)
+    in
+        not <| List.all (\seg -> overlappingSegment seg segments) pathSegments
+
+
 resolveInstruction : Time -> Int -> Instruction -> Level -> ( Level, Mode )
 resolveInstruction time i instruction level =
     case instruction of
+        DoNothing ->
+            ( level, Executing (i + 1) time )
+
         Move direction ->
             let
                 newPath =
@@ -636,7 +679,7 @@ viewMap grid (Map segments) =
 
 
 viewLevel : Model -> Level -> Html Msg
-viewLevel model { path, functions, items, conditionalPrepared, map } =
+viewLevel model { path, functions, items, conditionalPrepared, map, allowed } =
     let
         renderedPath =
             renderPath path
@@ -683,62 +726,39 @@ viewLevel model { path, functions, items, conditionalPrepared, map } =
             , viewFunctions model.mode functions model.grid model.time
             , let
                 instructions =
-                    callInstructions (Selectable.length functions)
+                    getAllowedInstructions allowed (Selectable.length functions) conditionalPrepared
 
                 instructionCount =
                     List.length instructions
               in
                 Svg.g []
-                    [ Svg.g [] (List.indexedMap (viewInstructionControl conditionalPrepared model.grid) instructions)
-                    , Svg.g [ Grid.transformFrom model.grid Grid.topRight 1 (instructionCount + 1) ]
-                        [ Svg.circle
-                            [ Svg.Attributes.cx <| toString (0 * 55)
-                            , Svg.Attributes.cy <| toString (0)
-                            , Svg.Attributes.fill (rgbColor Color.blue)
-                            , Svg.Attributes.stroke (rgbColor Color.black)
-                            , Svg.Attributes.strokeWidth "3"
-                            , Svg.Attributes.r "30"
-                            , Svg.Attributes.class "instruction-control"
-                            , onClick (PrepareConditional Circle)
-                            ]
-                            []
-                        , Svg.rect
-                            [ Svg.Attributes.x <| toString (-25)
-                            , Svg.Attributes.y <| toString 33
-                            , Svg.Attributes.width <| toString 50
-                            , Svg.Attributes.height <| toString 50
-                            , Svg.Attributes.fill (rgbColor Color.green)
-                            , Svg.Attributes.class "instruction-control"
-                            , onClick (PrepareConditional Square)
-                            ]
-                            []
-                        ]
-                    ]
+                    (List.indexedMap (viewInstructionControl model.grid) instructions)
             ]
 
 
-winning : Path -> List Item -> Bool
-winning path items =
-    let
-        nodes =
-            List.filter (\item -> item.kind == Node) items
-
-        rendered =
-            renderPath path
-    in
-        List.all (\node -> overlapping { x = node.x, y = node.y } rendered) nodes
+viewInstructionControl : Grid -> Int -> Instruction -> Html Msg
+viewInstructionControl grid i instruction =
+    Svg.g
+        [ Grid.transformFrom grid Grid.topRight 1 (i + 1)
+        , Svg.Attributes.class "instruction-control"
+        , onClick (addInstruction instruction)
+        ]
+        [ viewInstruction False 0 (Just instruction) ]
 
 
-losing : Map -> Path -> Bool
-losing (Map segments) path =
-    let
-        rendered =
-            renderPath path
+addInstruction : Instruction -> Msg
+addInstruction instruction =
+    case instruction of
+        If condition inst ->
+            case inst of
+                DoNothing ->
+                    PrepareConditional condition
 
-        pathSegments =
-            List.map2 (Seg) rendered (List.drop 1 rendered)
-    in
-        not <| List.all (\seg -> overlappingSegment seg segments) pathSegments
+                _ ->
+                    AddInstruction instruction
+
+        x ->
+            AddInstruction x
 
 
 dotSizes : { cursor : Int, item : Int }
@@ -976,27 +996,6 @@ viewHint mode insts time =
                 Svg.text ""
 
 
-viewInstructionControl : Maybe ItemType -> Grid -> Int -> Instruction -> Html Msg
-viewInstructionControl mItemType grid i instruction =
-    Svg.g
-        [ Grid.transformFrom grid Grid.topRight 1 (i + 1)
-        , Svg.Attributes.class "instruction-control"
-        , case mItemType of
-            Nothing ->
-                onClick (AddInstruction instruction)
-
-            Just condition ->
-                onClick (AddInstruction (If condition instruction))
-        ]
-        [ case mItemType of
-            Nothing ->
-                viewInstruction False 0 (Just instruction)
-
-            Just condition ->
-                viewInstruction False 0 (Just (If condition instruction))
-        ]
-
-
 viewInstruction : Bool -> Int -> Maybe Instruction -> Html Msg
 viewInstruction selected i mInstruction =
     let
@@ -1089,6 +1088,9 @@ viewInstruction selected i mInstruction =
                                 []
                 in
                     case instruction of
+                        DoNothing ->
+                            circle Color.darkCharcoal []
+
                         Move direction ->
                             circle Color.darkCharcoal (symbol instruction)
 

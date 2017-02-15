@@ -23,6 +23,7 @@ type alias Level =
     , functions : Selectable Function
     , stack : List StackLevel
     , conditionalPrepared : Maybe ItemType
+    , allowed : AllowedInstructions
     }
 
 
@@ -80,6 +81,13 @@ type Direction
     | Down
 
 
+type AllowedInstructions
+    = AllowMove
+    | AllowMoveFn
+    | AllowMoveFnIf
+    | AllowAll
+
+
 allInstructions : List Instruction
 allInstructions =
     [ Move Up
@@ -92,32 +100,61 @@ allInstructions =
     ]
 
 
-callInstructions : Int -> List Instruction
-callInstructions fnCount =
+getAllowedInstructions : AllowedInstructions -> Int -> Maybe ItemType -> List Instruction
+getAllowedInstructions allowed fnCount conditional =
     let
-        base =
+        moves =
             [ Move Up
             , Move Right
             , Move Down
             , Move Left
             ]
+
+        makeConditional doThing =
+            case doThing of
+                If _ _ ->
+                    doThing
+
+                _ ->
+                    case conditional of
+                        Nothing ->
+                            doThing
+
+                        Just condition ->
+                            If condition doThing
+
+        functions count =
+            if fnCount == 1 then
+                [ Call One ]
+            else if fnCount == 2 then
+                [ Call One, Call Two ]
+            else if fnCount == 3 then
+                [ Call One, Call Two, Call Three ]
+            else
+                []
+
+        ifInstruction =
+            [ If Square DoNothing, If Circle DoNothing ]
     in
-        if fnCount == 0 then
-            base
-        else if fnCount == 1 then
-            base ++ [ Call One ]
-        else if fnCount == 2 then
-            base ++ [ Call One, Call Two ]
-        else if fnCount == 3 then
-            base ++ [ Call One, Call Two, Call Three ]
-        else
-            base
+        case allowed of
+            AllowMove ->
+                List.map makeConditional moves
+
+            AllowMoveFn ->
+                List.map makeConditional <| moves ++ functions fnCount
+
+            AllowMoveFnIf ->
+                List.map makeConditional <| moves ++ functions fnCount ++ ifInstruction
+
+            AllowAll ->
+                List.map makeConditional <| moves ++ functions fnCount ++ ifInstruction
 
 
 type Instruction
     = Move Direction
     | Call FnIndex
     | If ItemType Instruction
+    | DoNothing
 
 
 type FnIndex
@@ -278,73 +315,6 @@ move direction (Path start remainder) =
 resetPath : Path -> Path
 resetPath (Path start _) =
     Path start []
-
-
-initialModel : Model
-initialModel =
-    { grid = Grid.init 60 60 1000 600
-    , width = 1000
-    , height = 600
-    , running = True
-    , time = 0
-    , mode = Playing
-    , levels =
-        selectable []
-            []
-            { path = Path { x = 5, y = 5 } []
-            , map =
-                Map
-                    [ Seg { x = 5, y = 5 } { x = 6, y = 5 }
-                    , Seg { x = 6, y = 5 } { x = 6, y = 6 }
-                    , Seg { x = 6, y = 6 } { x = 7, y = 6 }
-                    , Seg { x = 7, y = 6 } { x = 7, y = 7 }
-                    , Seg { x = 7, y = 7 } { x = 8, y = 7 }
-                    , Seg { x = 8, y = 7 } { x = 9, y = 7 }
-                    , Seg { x = 9, y = 7 } { x = 10, y = 7 }
-                    , Seg { x = 10, y = 7 } { x = 11, y = 7 }
-                    , Seg { x = 11, y = 7 } { x = 12, y = 7 }
-                    ]
-            , stack = []
-            , items =
-                [ { x = 6
-                  , y = 5
-                  , kind = Node
-                  }
-                , { x = 6
-                  , y = 6
-                  , kind = Square
-                  }
-                , { x = 8
-                  , y = 7
-                  , kind = Circle
-                  }
-                , { x = 12
-                  , y = 7
-                  , kind = Node
-                  }
-                ]
-            , conditionalPrepared = Nothing
-            , functions =
-                selectable []
-                    [ { instructions =
-                            [ Nothing
-                            , Nothing
-                            , Nothing
-                            , Nothing
-                            , Nothing
-                            ]
-                      }
-                    ]
-                    { instructions =
-                        [ Nothing
-                        , Nothing
-                        , Nothing
-                        , Nothing
-                        , Nothing
-                        ]
-                    }
-            }
-    }
 
 
 resizeGrid : Int -> Int -> Model -> Model

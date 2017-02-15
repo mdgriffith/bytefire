@@ -35,7 +35,8 @@ type Mode
     = Playing
     | Executing Int Time
     | Paused
-    | Success
+    | Success Time
+    | GameFinished
     | Failed Time Why
 
 

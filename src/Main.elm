@@ -31,9 +31,8 @@ initialModel =
     , time = 0
     , mode = Playing
     , levels =
-        selectable []
-            []
-            Levels.greenTest
+        Selectable.fromList [ Levels.levelOne, Levels.levelTwo ]
+            |> Maybe.withDefault (Selectable.singleton Levels.levelOne)
     }
 
 
@@ -103,10 +102,10 @@ type Msg
     | RemoveInstruction
     | PrepareConditional ItemType
     | Select Int
+    | NextLevel
     | Execute
     | ExecuteNextStep
     | TogglePause
-    | Fail
     | Tick Time
     | WindowResize
         { width : Int
@@ -189,6 +188,11 @@ update msg model =
             , Cmd.none
             )
 
+        NextLevel ->
+            ( { model | levels = Selectable.next model.levels }
+            , Cmd.none
+            )
+
         AddInstruction instruction ->
             ( onCurrentLevel model
                 (\level ->
@@ -245,9 +249,6 @@ update msg model =
                             model.levels
                 }
 
-        Fail ->
-            ( model, Cmd.none )
-
         ExecuteNextStep ->
             case model.mode of
                 Executing i _ ->
@@ -268,7 +269,7 @@ update msg model =
                             Nothing ->
                                 if winning model.levels.current.path model.levels.current.items then
                                     ( { model
-                                        | mode = Success
+                                        | mode = Success model.time
                                       }
                                     , Cmd.none
                                     )
@@ -340,12 +341,30 @@ update msg model =
                             )
 
                     Failed failTime _ ->
-                        if time - failTime > 10.0 * Time.second then
+                        if time - failTime > 1.0 * Time.second then
                             update
                                 Reboot
                                 { model
                                     | time = time
                                 }
+                        else
+                            ( { model
+                                | time = time
+                              }
+                            , Cmd.none
+                            )
+
+                    Success successTime ->
+                        if time - successTime > 1.0 * Time.second then
+                            if Selectable.atEnd model.levels then
+                                ( { model | mode = GameFinished }, Cmd.none )
+                            else
+                                update
+                                    NextLevel
+                                    { model
+                                        | time = time
+                                        , mode = Playing
+                                    }
                         else
                             ( { model
                                 | time = time
@@ -429,7 +448,7 @@ resolveInstruction time i instruction level =
                     ( { level
                         | path = newPath
                       }
-                    , Success
+                    , Success time
                     )
                 else if losing level.map newPath then
                     ( { level
@@ -549,10 +568,16 @@ view model =
                         [ text "[ Paused ]" ]
                     ]
 
-            Success ->
+            Success _ ->
                 div [ class "overlay" ]
                     [ div [ class "centered", style [ ( "color", rgbColor Color.green ) ] ]
                         [ text "[ Success ]" ]
+                    ]
+
+            GameFinished ->
+                div [ class "overlay" ]
+                    [ div [ class "centered", style [ ( "color", rgbColor Color.green ) ] ]
+                        [ text "[ You have beaten the game. ]" ]
                     ]
 
             Failed _ reason ->
@@ -1113,11 +1138,6 @@ viewInstruction selected i mInstruction =
 
                                 Circle ->
                                     circle Color.blue (symbol instruction)
-
-
-viewFunctionUI : List Instruction -> Html Msg
-viewFunctionUI fns =
-    Svg.g [] []
 
 
 pulseOpacityOffset : Float -> Time -> Html.Attribute msg

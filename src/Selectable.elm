@@ -14,10 +14,26 @@ type Loc
     | Upcoming
 
 
+fromList : List a -> Maybe (Selectable a)
+fromList list =
+    case list of
+        [] ->
+            Nothing
 
---fromList : List a -> a -> Maybe (Selectable a)
---fromList list =
---    case list of
+        start :: remain ->
+            Just
+                { past = []
+                , current = start
+                , upcoming = remain
+                }
+
+
+singleton : a -> Selectable a
+singleton current =
+    { past = []
+    , current = current
+    , upcoming = []
+    }
 
 
 length : Selectable a -> Int
@@ -50,6 +66,24 @@ select i ({ past, current, upcoming } as x) =
                 |> Maybe.withDefault current
         , upcoming = List.drop (normalizedIndex + 1) full
         }
+
+
+next : Selectable a -> Selectable a
+next ({ past, current, upcoming } as selected) =
+    case upcoming of
+        [] ->
+            selected
+
+        nxt :: remaining ->
+            { past = past ++ [ current ]
+            , current = nxt
+            , upcoming = remaining
+            }
+
+
+atEnd : Selectable a -> Bool
+atEnd { upcoming } =
+    List.isEmpty upcoming
 
 
 first : Selectable a -> a

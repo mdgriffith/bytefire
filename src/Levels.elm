@@ -1,6 +1,7 @@
 module Levels exposing (..)
 
 import Model exposing (Level, Path(..), Map(..), LineSegment(..), ItemType(..), selectable, AllowedInstructions(..))
+import Selectable
 
 
 levelOne : Level
@@ -22,8 +23,7 @@ levelOne =
         ]
     , conditionalPrepared = Nothing
     , functions =
-        selectable []
-            []
+        Selectable.singleton
             { instructions =
                 [ Nothing, Nothing, Nothing ]
             }
@@ -52,11 +52,67 @@ levelTwo =
         ]
     , conditionalPrepared = Nothing
     , functions =
-        selectable []
-            []
+        Selectable.singleton
             { instructions =
                 [ Nothing, Nothing, Nothing ]
             }
+    }
+
+
+levelThree : Level
+levelThree =
+    { allowed = AllowMoveFn
+    , path = Path { x = 5, y = 5 } []
+    , map =
+        Map
+            [ Seg { x = 5, y = 5 } { x = 6, y = 5 }
+            , Seg { x = 6, y = 5 } { x = 6, y = 6 }
+            , Seg { x = 6, y = 6 } { x = 7, y = 6 }
+            , Seg { x = 7, y = 6 } { x = 7, y = 7 }
+            , Seg { x = 7, y = 7 } { x = 8, y = 7 }
+            , Seg { x = 8, y = 7 } { x = 9, y = 7 }
+            , Seg { x = 9, y = 7 } { x = 10, y = 7 }
+            , Seg { x = 10, y = 7 } { x = 11, y = 7 }
+            , Seg { x = 11, y = 7 } { x = 12, y = 7 }
+            ]
+    , stack = []
+    , items =
+        [ { x = 12
+          , y = 7
+          , kind = Node
+          }
+        ]
+    , conditionalPrepared = Nothing
+    , functions =
+        Selectable.fromList
+            [ { instructions =
+                    [ Nothing
+                    , Nothing
+                    , Nothing
+                    , Nothing
+                    , Nothing
+                    ]
+              }
+            , { instructions =
+                    [ Nothing
+                    , Nothing
+                    , Nothing
+                    , Nothing
+                    , Nothing
+                    ]
+              }
+            ]
+            |> Maybe.withDefault
+                (Selectable.singleton
+                    { instructions =
+                        [ Nothing
+                        , Nothing
+                        , Nothing
+                        , Nothing
+                        , Nothing
+                        ]
+                    }
+                )
     }
 
 
@@ -81,8 +137,7 @@ greenTest =
         ]
     , conditionalPrepared = Nothing
     , functions =
-        selectable []
-            []
+        Selectable.singleton
             { instructions =
                 [ Nothing ]
             }
@@ -126,7 +181,7 @@ test =
         ]
     , conditionalPrepared = Nothing
     , functions =
-        selectable []
+        Selectable.fromList
             [ { instructions =
                     [ Nothing
                     , Nothing
@@ -135,13 +190,24 @@ test =
                     , Nothing
                     ]
               }
+            , { instructions =
+                    [ Nothing
+                    , Nothing
+                    , Nothing
+                    , Nothing
+                    , Nothing
+                    ]
+              }
             ]
-            { instructions =
-                [ Nothing
-                , Nothing
-                , Nothing
-                , Nothing
-                , Nothing
-                ]
-            }
+            |> Maybe.withDefault
+                (Selectable.singleton
+                    { instructions =
+                        [ Nothing
+                        , Nothing
+                        , Nothing
+                        , Nothing
+                        , Nothing
+                        ]
+                    }
+                )
     }

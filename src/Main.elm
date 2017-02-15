@@ -31,7 +31,7 @@ initialModel =
     , time = 0
     , mode = Playing
     , levels =
-        Selectable.fromList [ Levels.levelOne, Levels.levelTwo ]
+        Selectable.fromList [ Levels.levelOne, Levels.levelTwo, Levels.levelThree ]
             |> Maybe.withDefault (Selectable.singleton Levels.levelOne)
     }
 
@@ -577,7 +577,7 @@ view model =
             GameFinished ->
                 div [ class "overlay" ]
                     [ div [ class "centered", style [ ( "color", rgbColor Color.green ) ] ]
-                        [ text "[ You have beaten the game. ]" ]
+                        [ text "[ You have beaten the game.  That's fantastic. ]" ]
                     ]
 
             Failed _ reason ->

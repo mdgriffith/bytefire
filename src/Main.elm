@@ -31,8 +31,19 @@ initialModel =
     , time = 0
     , mode = Playing
     , levels =
-        Selectable.fromList [ Levels.levelOne, Levels.levelTwo, Levels.levelThree ]
-            |> Maybe.withDefault (Selectable.singleton Levels.levelOne)
+        Selectable.singleton <|
+            Levels.auto
+                [ { instructions =
+                        [ Just (Move Right)
+                        , Just (Move Right)
+                        , Just (Move Right)
+                        , Just (Move Right)
+                        , Just (Move Right)
+                        ]
+                  }
+                ]
+        --Selectable.fromList [ Levels.levelOne, Levels.levelTwo, Levels.levelThree ]
+        --    |> Maybe.withDefault (Selectable.singleton Levels.levelOne)
     }
 
 

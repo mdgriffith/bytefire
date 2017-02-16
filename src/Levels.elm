@@ -249,7 +249,12 @@ auto functions =
         , functions =
             Selectable.fromList functions
                 |> Maybe.withDefault emptyFns
-            --|> Selectable.map (\_ -> Nothing)
+                |> Selectable.map
+                    (\fn ->
+                        { fn
+                            | instructions = List.map (\_ -> Nothing) fn.instructions
+                        }
+                    )
         }
 
 
@@ -277,20 +282,35 @@ run coords functions =
 
 locationItems : List Location -> List Item
 locationItems locations =
-    List.filterMap
-        (\loc ->
-            case loc.item of
-                Nothing ->
-                    Nothing
+    let
+        withEndStar =
+            case List.reverse locations of
+                [] ->
+                    locations
 
-                Just item ->
-                    Just
-                        { x = loc.x
-                        , y = loc.y
-                        , kind = item
-                        }
-        )
-        locations
+                last :: tail ->
+                    case last.item of
+                        Nothing ->
+                            List.reverse ({ last | item = Just Node } :: tail)
+
+                        Just item ->
+                            -- This could potentially break a puzzle
+                            List.reverse ({ last | item = Just Node } :: tail)
+    in
+        List.filterMap
+            (\loc ->
+                case loc.item of
+                    Nothing ->
+                        Nothing
+
+                    Just item ->
+                        Just
+                            { x = loc.x
+                            , y = loc.y
+                            , kind = item
+                            }
+            )
+            withEndStar
 
 
 locationSegments : List Location -> List LineSegment
@@ -390,7 +410,7 @@ stepExecution _ execution =
 
 finished : Execution -> Bool
 finished execution =
-    ((List.length execution.functions.current.instructions == execution.instructionIndex + 1)
+    ((List.length execution.functions.current.instructions == execution.instructionIndex)
         && (List.length execution.stack == 0)
     )
         || (List.length execution.stack > 5)

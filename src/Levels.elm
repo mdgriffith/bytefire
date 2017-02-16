@@ -3,6 +3,7 @@ module Levels exposing (..)
 import Model exposing (..)
 import Selectable exposing (Selectable)
 import List.Extra
+import Combine exposing (..)
 
 
 levelOne : Level
@@ -256,6 +257,53 @@ auto functions =
                         }
                     )
         }
+
+
+decode : String -> Result.Result String (List Function)
+decode str =
+    case parse functions str of
+        Result.Ok ( _, _, n ) ->
+            Result.Ok n
+
+        Result.Err ( _, stream, ms ) ->
+            Result.Err ("parse error: " ++ (toString ms) ++ ", " ++ (toString stream))
+
+
+functions =
+    let
+        makeFn inst =
+            { instructions = List.map Just inst }
+    in
+        sepBy (string "|") (makeFn <$> (many instructions))
+
+
+instructions =
+    choice
+        [ Move Up <$ string "u"
+        , Move Down <$ string "d"
+        , Move Left <$ string "l"
+        , Move Right <$ string "r"
+        , Move Left <$ string "l"
+        , string "c" $> Call <*> parseCall
+        ]
+
+
+parseCall =
+    choice
+        [ One <$ string "One"
+        , Two <$ string "Two"
+        , Three <$ string "Three"
+        ]
+
+
+
+--instructions =
+--    choice
+--        [ Move Up <$ string "u"
+--        , Move Down <$ string "d"
+--        , Move Left <$ string "l"
+--        , Move Right <$ string "r"
+--        ]
 
 
 encode : List Function -> String

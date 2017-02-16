@@ -4,6 +4,7 @@ module Main exposing (..)
 -}
 
 import Window
+import Navigation
 import Time exposing (Time)
 import Task
 import AnimationFrame
@@ -59,8 +60,13 @@ debugEncode functions =
 
 main : Program Never Model Msg
 main =
-    Html.program
-        { init = ( initialModel, Task.perform WindowResize Window.size )
+    Navigation.program UrlChange
+        { init =
+            (\location ->
+                ( Tuple.first <| update (UrlChange location) initialModel
+                , Task.perform WindowResize Window.size
+                )
+            )
         , view = view
         , update = update
         , subscriptions =
@@ -118,6 +124,7 @@ main =
 
 type Msg
     = NoOp
+    | UrlChange Navigation.Location
     | Reboot
     | AddInstruction Instruction
     | RemoveInstruction
@@ -197,6 +204,25 @@ update msg model =
     case msg of
         NoOp ->
             ( model, Cmd.none )
+
+        UrlChange location ->
+            if location.hash == "" || location.hash == "#" then
+                ( model, Cmd.none )
+            else
+                case Levels.decode (String.dropLeft 1 location.hash) of
+                    Result.Ok fns ->
+                        ( { model
+                            | levels = Selectable.singleton (Levels.auto fns)
+                          }
+                        , Cmd.none
+                        )
+
+                    Result.Err err ->
+                        let
+                            _ =
+                                Debug.log "newLevel" err
+                        in
+                            ( model, Cmd.none )
 
         Reboot ->
             ( onCurrentLevel { model | mode = Playing }

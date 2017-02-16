@@ -4,6 +4,7 @@ import Model exposing (..)
 import Selectable exposing (Selectable)
 import List.Extra
 import Combine exposing (..)
+import Char
 
 
 levelOne : Level
@@ -261,7 +262,7 @@ auto functions =
 
 decode : String -> Result.Result String (List Function)
 decode str =
-    case parse functions str of
+    case parse functions (unshift str) of
         Result.Ok ( _, _, n ) ->
             Result.Ok n
 
@@ -327,6 +328,7 @@ encode functions =
     functions
         |> List.map fnToString
         |> String.join "|"
+        |> shift
 
 
 fnToString : Function -> String

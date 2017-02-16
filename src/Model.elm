@@ -164,6 +164,18 @@ type FnIndex
     | Three
 
 
+realIndex i =
+    case i of
+        One ->
+            0
+
+        Two ->
+            1
+
+        Three ->
+            2
+
+
 {-| Problem with making a game about programming is that you get overlapping words :/
 -}
 type alias Function =

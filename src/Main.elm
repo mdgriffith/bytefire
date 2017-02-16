@@ -32,19 +32,29 @@ initialModel =
     , mode = Playing
     , levels =
         Selectable.singleton <|
-            Levels.auto
-                [ { instructions =
-                        [ Just (Move Right)
-                        , Just (Move Right)
-                        , Just (Move Right)
-                        , Just (Move Right)
-                        , Just (Move Right)
-                        ]
-                  }
-                ]
+            Levels.auto <|
+                debugEncode
+                    [ { instructions =
+                            [ Just (Move Right)
+                            , Just (Move Right)
+                            , Just (Move Right)
+                            , Just (Move Right)
+                            , Just (Move Right)
+                            ]
+                      }
+                    ]
         --Selectable.fromList [ Levels.levelOne, Levels.levelTwo, Levels.levelThree ]
         --    |> Maybe.withDefault (Selectable.singleton Levels.levelOne)
     }
+
+
+debugEncode : List Function -> List Function
+debugEncode functions =
+    let
+        _ =
+            Debug.log "encoded" (Levels.encode functions)
+    in
+        functions
 
 
 main : Program Never Model Msg

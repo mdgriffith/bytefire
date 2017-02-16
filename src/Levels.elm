@@ -258,6 +258,63 @@ auto functions =
         }
 
 
+encode : List Function -> String
+encode functions =
+    functions
+        |> List.map fnToString
+        |> String.join "|"
+
+
+fnToString : Function -> String
+fnToString fn =
+    let
+        conditionToString cond =
+            case cond of
+                Node ->
+                    "n"
+
+                Square ->
+                    "sq"
+
+                Circle ->
+                    "cir"
+
+        toInstructionString inst =
+            case inst of
+                Move Left ->
+                    "l"
+
+                Move Right ->
+                    "r"
+
+                Move Up ->
+                    "u"
+
+                Move Down ->
+                    "d"
+
+                Call fnIndex ->
+                    "c" ++ (toString <| realIndex fnIndex)
+
+                If condition instruction ->
+                    "if" ++ (conditionToString condition) ++ toInstructionString instruction
+
+                DoNothing ->
+                    "-"
+    in
+        fn.instructions
+            |> List.filterMap
+                (\mInstruct ->
+                    case mInstruct of
+                        Nothing ->
+                            Nothing
+
+                        Just inst ->
+                            Just <| toInstructionString inst
+                )
+            |> String.concat
+
+
 emptyFns =
     Selectable.singleton
         { instructions =

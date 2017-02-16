@@ -269,6 +269,22 @@ decode str =
             Result.Err ("parse error: " ++ (toString ms) ++ ", " ++ (toString stream))
 
 
+shift : String -> String
+shift str =
+    str
+        |> String.toList
+        |> List.map (Char.toCode >> (\x -> x + 2) >> Char.fromCode)
+        |> String.fromList
+
+
+unshift : String -> String
+unshift str =
+    str
+        |> String.toList
+        |> List.map (Char.toCode >> (\x -> x - 2) >> Char.fromCode)
+        |> String.fromList
+
+
 functions =
     let
         makeFn inst =

@@ -5,6 +5,81 @@ import Selectable exposing (Selectable)
 import List.Extra
 import Combine exposing (..)
 import Char
+import Grid exposing (Grid(..))
+
+
+center : Grid -> Level -> Level
+center (Grid { columns, rows }) level =
+    let
+        addPoint { x, y } ( originX, originY, width, height ) =
+            case ( originX, originY, width, height ) of
+                ( 0, 0, 0, 0 ) ->
+                    ( x, y, 0, 0 )
+
+                _ ->
+                    let
+                        ( newX, dWidth ) =
+                            if x < originX then
+                                ( x, originX - x )
+                            else
+                                ( originX, 0 )
+
+                        ( newY, dHeight ) =
+                            if y < originY then
+                                ( y, originY - y )
+                            else
+                                ( y, 0 )
+
+                        newWidth =
+                            if originX + width < x then
+                                width + (x - (originX + width))
+                            else
+                                width + dWidth
+
+                        newHeight =
+                            if originY + height < y then
+                                height + (y - (originY + height))
+                            else
+                                height + dHeight
+                    in
+                        ( newX, newY, newWidth, newHeight )
+
+        bounds (Seg p1 p2) box =
+            box
+                |> addPoint p1
+                |> addPoint p2
+
+        ( x, y, width, height ) =
+            case level.map of
+                Map segments ->
+                    List.foldl bounds ( 0, 0, 0, 0 ) segments
+
+        dx =
+            ((columns - width) // 2) - x
+
+        dy =
+            ((rows - height) // 2) - y
+
+        adjust coords =
+            { coords
+                | x = coords.x + dx
+                , y = coords.y + dy
+            }
+
+        mapSegment fn (Seg p1 p2) =
+            Seg (fn p1) (fn p2)
+
+        newMap (Map segments) =
+            Map <| List.map (mapSegment adjust) segments
+
+        newPath (Path fst tail) =
+            Path (adjust fst) tail
+    in
+        { level
+            | map = newMap level.map
+            , items = List.map adjust level.items
+            , path = newPath level.path
+        }
 
 
 levelOne : Level

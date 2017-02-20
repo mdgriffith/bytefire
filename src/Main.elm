@@ -23,28 +23,26 @@ import List.Extra
 import Levels
 
 
+mainGrid =
+    Grid.init 60 60 1000 600
+
+
 initialModel : Model
 initialModel =
-    { grid = Grid.init 60 60 1000 600
+    { grid = mainGrid
     , width = 1000
     , height = 600
     , running = True
     , time = 0
-    , mode = Playing
+    , mode = MainMenu
     , levels =
         Selectable.singleton <|
-            Levels.auto <|
-                debugEncode
-                    [ { instructions =
-                            [ Just (Move Right)
-                            , Just (Move Right)
-                            , Just (Move Right)
-                            , Just (Move Right)
-                            , Just (Move Right)
-                            ]
-                      }
-                    ]
-        --Selectable.fromList [ Levels.levelOne, Levels.levelTwo, Levels.levelThree ]
+            Levels.center mainGrid Levels.levelOne
+        --Selectable.fromList
+        --    [ Levels.center mainGrid Levels.levelOne
+        --    , Levels.center mainGrid Levels.levelTwo
+        --    , Levels.center mainGrid Levels.levelThree
+        --    ]
         --    |> Maybe.withDefault (Selectable.singleton Levels.levelOne)
     }
 
@@ -82,12 +80,6 @@ main =
                     , Keyboard.downs
                         (\code ->
                             case model.mode of
-                                Paused ->
-                                    if code == keyboard.esc then
-                                        TogglePause
-                                    else
-                                        NoOp
-
                                 Playing ->
                                     if code == keyboard.left then
                                         AddInstruction <| Move Left
@@ -115,7 +107,10 @@ main =
                                         NoOp
 
                                 _ ->
-                                    NoOp
+                                    if code == keyboard.esc then
+                                        TogglePause
+                                    else
+                                        NoOp
                         )
                     ]
             )
@@ -456,6 +451,20 @@ update msg model =
                 )
 
 
+resizeGrid : Int -> Int -> Model -> Model
+resizeGrid width height model =
+    let
+        newGrid =
+            Grid.resize width height model.grid
+    in
+        { model
+            | grid = newGrid
+            , width = width
+            , height = height
+            , levels = Selectable.map (Levels.center newGrid) model.levels
+        }
+
+
 winning : Path -> List Item -> Bool
 winning path items =
     let
@@ -582,11 +591,11 @@ body {
 .centered {
    position:absolute;
    width:1000px;
-   height:60px;
+   height:300px;
    left:50%;
    margin-left:-500px;
    top:50%;
-   margin-top:-30px;
+   margin-top:-200px;
    text-align:center;
 }
 .fn-label {
@@ -598,6 +607,20 @@ body {
 .instruction-control {
     cursor: pointer;
 }
+.menu-item {
+    cursor:pointer;
+    color:white;
+    margin:0;
+    text-align:center;
+}
+.menu-item:hover {
+    color:#eee;
+}
+.menu-title {
+    text-align:center;
+    margin-bottom:20px;
+    color:white;
+}
 
 """
 
@@ -607,18 +630,34 @@ view model =
     div [ width model.width, height model.height ]
         [ node "style" [] [ text stylesheet ]
         , Html.Lazy.lazy3 viewGrid model.width model.height model.grid
-        , viewLevel model model.levels.current
+        , case model.mode of
+            MainMenu ->
+                text ""
+
+            _ ->
+                viewLevel model model.levels.current
         , case model.mode of
             Paused ->
                 div [ class "overlay" ]
-                    [ div [ class "centered", style [ ( "color", rgbColor Color.red ) ] ]
-                        [ text "[ Paused ]" ]
+                    [ div [ class "centered" ]
+                        [ h1 [ class "menu-title", style [ ( "color", rgbColor Color.red ) ] ] [ text "[ paused ]" ]
+                        , div [ class "menu-item", onClick TogglePause ] [ text "continue" ]
+                        , div [ class "menu-item", onClick Reboot ] [ text "restart" ]
+                        ]
+                    ]
+
+            MainMenu ->
+                div [ class "overlay" ]
+                    [ div [ class "centered", style [ ( "color", rgbColor Color.grey ), ( "text-transform", "lowercase" ) ] ]
+                        [ h1 [ class "menu-title", style [ ( "color", rgbColor Color.yellow ) ] ] [ text "[ welcome to elmbozzle ]" ]
+                        , div [ class "menu-item", onClick Reboot ] [ text "start" ]
+                        ]
                     ]
 
             Success _ ->
                 div [ class "overlay" ]
                     [ div [ class "centered", style [ ( "color", rgbColor Color.green ) ] ]
-                        [ text "[ Success ]" ]
+                        [ text "[ success ]" ]
                     ]
 
             GameFinished ->
@@ -653,7 +692,6 @@ viewGrid modelWidth modelHeight grid =
                     , Svg.Attributes.fill (rgbColor Color.charcoal)
                     , Svg.Attributes.stroke "rgba(0,0,0,0.0)"
                     , Svg.Attributes.r "3"
-                      --, pulseOpacityOffset (toFloat (x + y)) currentTime
                     ]
                     []
         ]

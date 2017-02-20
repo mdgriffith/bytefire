@@ -35,6 +35,7 @@ type Mode
     = Playing
     | Executing Int Time
     | Paused
+    | MainMenu
     | Success Time
     | GameFinished
     | Failed Time Why
@@ -328,15 +329,6 @@ move direction (Path start remainder) =
 resetPath : Path -> Path
 resetPath (Path start _) =
     Path start []
-
-
-resizeGrid : Int -> Int -> Model -> Model
-resizeGrid width height model =
-    { model
-        | grid = Grid.resize width height model.grid
-        , width = width
-        , height = height
-    }
 
 
 selectable : List a -> List a -> a -> Selectable a
